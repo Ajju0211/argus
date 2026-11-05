@@ -1,0 +1,47 @@
+schema_version: "1.0"
+assessment_id: "asm-20261104-001"
+name: "Authorized Hackathon Target Evaluation"
+created_at: "2026-11-04T12:00:00Z"
+expires_at: "2027-12-31T23:59:59Z"
+
+targets:
+  allowed_hosts:
+    - "192.168.100.5"
+    - "lab-target.local"
+  allowed_subnets:
+    - "192.168.100.0/28"
+  denied_hosts:
+    - "192.168.100.1"
+    - "169.254.169.254"
+    - "127.0.0.1"
+
+ports:
+  allowed_ports: [80, 443, 8080, 8443, 22]
+  denied_ports: [25, 445, 139, 3389]
+
+protocols:
+  allowed: ["http", "https", "tcp"]
+  denied: ["udp", "icmp", "dns-zone-transfer"]
+
+actions:
+  allowed_categories:
+    - "network_recon"
+    - "web_crawl"
+    - "passive_vuln_scan"
+    - "active_template_check"
+  prohibited_categories:
+    - "denial_of_service"
+    - "brute_force_credentials"
+    - "arbitrary_command_injection"
+    - "lateral_movement"
+    - "privilege_escalation"
+
+rate_limits:
+  max_requests_per_second: 20
+  max_concurrency: 2
+  tool_timeout_seconds: 180
+
+network_policy:
+  redirect_policy: "strict_same_host"
+  allow_external_dns: false
+

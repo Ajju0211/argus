@@ -1,0 +1,24 @@
+schema_version: "1.0"
+assessment_id: "asm-20261104-002"
+name: "Expired Target Evaluation"
+created_at: "2026-11-01T12:00:00Z"
+expires_at: "2026-11-02T12:00:00Z"
+
+targets:
+  allowed_hosts:
+    - "192.168.100.5"
+  allowed_subnets:
+    - "192.168.100.0/28"
+  denied_hosts:
+    - "192.168.100.1"
+
+ports:
+  allowed_ports: [8080]
+  denied_ports: [25]
+
+actions:
+  allowed_categories:
+    - "network_recon"
+  prohibited_categories:
+    - "denial_of_service"
+

@@ -1,0 +1,8 @@
+{
+  "include": ["core", "packages", "engine", "integrations", "tests"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "standard"
+}
+

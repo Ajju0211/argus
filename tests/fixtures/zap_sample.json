@@ -1,0 +1,64 @@
+{
+  "@programName": "ZAP",
+  "@version": "2.14.0",
+  "@generated": "2026-11-04 12:10:00",
+  "site": [
+    {
+      "@name": "http://192.168.100.5:8080",
+      "@host": "192.168.100.5",
+      "@port": "8080",
+      "@ssl": "false",
+      "alerts": [
+        {
+          "pluginid": "10038",
+          "alertRef": "10038",
+          "alert": "Content Security Policy (CSP) Header Not Set",
+          "name": "Content Security Policy (CSP) Header Not Set",
+          "riskcode": "2",
+          "confidence": "3",
+          "riskdesc": "Medium (High)",
+          "desc": "Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate certain types of attacks, including Cross Site Scripting (XSS) and data injection attacks.",
+          "instances": [
+            {
+              "uri": "http://192.168.100.5:8080/",
+              "method": "GET",
+              "param": "",
+              "attack": "",
+              "evidence": ""
+            }
+          ],
+          "count": "1",
+          "solution": "Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header.",
+          "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
+          "cweid": "693",
+          "wascid": "15"
+        },
+        {
+          "pluginid": "10020",
+          "alertRef": "10020",
+          "alert": "X-Frame-Options Header Missing",
+          "name": "X-Frame-Options Header Missing",
+          "riskcode": "1",
+          "confidence": "2",
+          "riskdesc": "Low (Medium)",
+          "desc": "The Anti-MIME-Sniffing header X-Content-Type-Options was not set to 'nosniff'.",
+          "instances": [
+            {
+              "uri": "http://192.168.100.5:8080/",
+              "method": "GET",
+              "param": "X-Frame-Options",
+              "attack": "",
+              "evidence": ""
+            }
+          ],
+          "count": "1",
+          "solution": "Configure server to send X-Frame-Options header.",
+          "reference": "",
+          "cweid": "1021",
+          "wascid": "15"
+        }
+      ]
+    }
+  ]
+}
+
