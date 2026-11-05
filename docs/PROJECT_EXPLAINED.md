@@ -375,7 +375,7 @@ cp .env.example .env
 docker compose up --build
 ```
 - Open `http://localhost:3000` to see the **Cyber Command Dashboard**.
-- Open `http://localhost:8080` to see the **Bifrost OSS Web UI Gateway**.
+- Open `http://localhost:8080` to see the **Bifrost OSS Web UI Gateway** (enter setup token `argus-admin-token-2026` on first load to initialize your admin user).
 - Open `http://localhost:8000/docs` to see the **FastAPI Swagger API Documentation**.
 - Open `http://localhost:8888` to see the **Mock Target Lab**.
 

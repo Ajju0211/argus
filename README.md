@@ -156,6 +156,7 @@ docker compose up --build
 #### Step 4: Access the Command Center
 - Open `http://localhost:3000` to view the **Cyber Command Dashboard**.
 - Open `http://localhost:8080` to view the **Bifrost Gateway Web UI**.
+  - *First-time Setup:* If prompted for a setup token, enter: `argus-admin-token-2026` (configured in `.env` / `docker-compose.yml`) to set your admin username and password.
 - Click **"New Assessment"** in the dashboard and enter target `http://localhost:8888` (or use the pre-loaded "Judge Lab Demo Assessment" preset).
 - Click **"Engage Agent"** to watch the autonomous ReAct reasoning loop operate live.
 
