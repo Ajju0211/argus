@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARGUS — Autonomous Security Testing. Verified by Evidence.</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #121a31;
+    --panel-2: #0e1528;
+    --line: #24304f;
+    --ink: #e7edf9;
+    --muted: #8b9bbd;
+    --brand: #5b8cff;
+    --accent: #30d58a;
+    --warn: #f5b64a;
+    --danger: #ff6b7a;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, #172554 0%, transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, #0f3d34 0%, transparent 55%),
+      var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 20px 28px; border-bottom: 1px solid var(--line);
+    background: rgba(11, 16, 32, 0.82); backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .mark {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: linear-gradient(145deg, var(--brand), #8b5cf6);
+    display: grid; place-items: center; font-weight: 800; letter-spacing: -1px;
+    box-shadow: 0 0 24px rgba(91, 140, 255, 0.45);
+  }
+  h1 { font-size: 17px; margin: 0; letter-spacing: 0.4px; }
+  .tagline { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .header-meta { display: flex; gap: 10px; align-items: center; }
+  .badge {
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 11px;
+    font-size: 11px; color: var(--muted); font-family: var(--mono);
+  }
+  main { max-width: 1240px; margin: 0 auto; padding: 24px 22px 60px; }
+  .grid { display: grid; grid-template-columns: 380px 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 940px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border: 1px solid var(--line); border-radius: 14px; padding: 18px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.1px;
+    color: var(--muted); margin: 0 0 14px; }
+  label { display: block; font-size: 11px; color: var(--muted); margin: 12px 0 5px;
+    text-transform: uppercase; letter-spacing: 0.8px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; background: #080d1b; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 9px; padding: 10px 11px;
+    font-family: var(--mono); font-size: 12px; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--brand); }
+  textarea { min-height: 190px; resize: vertical; line-height: 1.45; }
+  .row { display: flex; gap: 10px; }
+  .row > div { flex: 1; }
+  .check { display: flex; gap: 8px; align-items: center; margin-top: 14px;
+    color: var(--muted); font-size: 12px; }
+  button {
+    width: 100%; margin-top: 16px; padding: 12px 14px; border-radius: 9px;
+    border: 0; background: linear-gradient(135deg, var(--brand), #7c5cff);
+    color: white; font-weight: 700; font-size: 13px; cursor: pointer;
+    letter-spacing: 0.3px;
+  }
+  button:hover { filter: brightness(1.08); }
+  button.secondary { background: #1b2644; border: 1px solid var(--line); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .status-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .pill { border-radius: 999px; padding: 5px 11px; font-size: 11px; font-family: var(--mono);
+    border: 1px solid var(--line); color: var(--muted); }
+  .pill.run { color: #9fc0ff; border-color: #2c4a86; background: #101c3a; }
+  .pill.ok { color: var(--accent); border-color: #196146; background: #0c241c; }
+  .pill.fail { color: var(--danger); border-color: #6a2630; background: #2a1015; }
+  .pill.warn { color: var(--warn); border-color: #6b5222; background: #241c0b; }
+  .metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 800px) { .metrics { grid-template-columns: repeat(3, 1fr); } }
+  .metric { background: #0a1122; border: 1px solid var(--line); border-radius: 10px; padding: 11px; }
+  .metric .n { font-size: 20px; font-weight: 750; font-family: var(--mono); }
+  .metric .l { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .section { margin-top: 18px; }
+  .log {
+    background: #060a14; border: 1px solid var(--line); border-radius: 10px;
+    height: 260px; overflow: auto; padding: 12px; font-family: var(--mono);
+    font-size: 11.5px; line-height: 1.6;
+  }
+  .log .t { color: #56688f; }
+  .log .node { color: #9fc0ff; }
+  .log .ok { color: var(--accent); }
+  .log .bad { color: var(--danger); }
+  .finding {
+    border: 1px solid var(--line); border-left: 3px solid var(--danger);
+    border-radius: 9px; padding: 11px 13px; margin-bottom: 9px; background: #0a1122;
+  }
+  .finding .title { font-weight: 650; font-size: 13px; }
+  .finding .meta { color: var(--muted); font-size: 11px; font-family: var(--mono); margin-top: 5px; }
+  .empty { color: var(--muted); font-size: 12px; font-family: var(--mono); padding: 6px 0; }
+  .links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .links a { color: #9fc0ff; font-size: 12px; font-family: var(--mono); text-decoration: none;
+    border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: #0a1122; }
+  .links a:hover { border-color: var(--brand); }
+  .mono { font-family: var(--mono); font-size: 11px; color: var(--muted); word-break: break-all; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="mark">A</div>
+    <div>
+      <h1>ARGUS</h1>
+      <div class="tagline">Autonomous Security Testing. Verified by Evidence.</div>
+    </div>
+  </div>
+  <div class="header-meta">
+    <span class="badge" id="modeBadge">SIMULATION</span>
+    <span class="badge">Challenge 03 · Track A</span>
+  </div>
+</header>
+
+<main>
+  <div class="grid">
+    <section class="card">
+      <h2>Launch Authorized Assessment</h2>
+      <label for="target">Target</label>
+      <input id="target" type="text" value="http://mock-target-lab:8080" spellcheck="false">
+
+      <div class="row">
+        <div>
+          <label for="objective">Objective</label>
+          <select id="objective">
+            <option value="discover_services">Discover services</option>
+            <option value="severity_threshold">Confirm severity threshold</option>
+            <option value="find_cve">Confirm a vulnerability</option>
+          </select>
+        </div>
+        <div>
+          <label for="iterations">Max iterations</label>
+          <input id="iterations" type="number" min="1" max="50" value="8">
+        </div>
+      </div>
+
+      <label for="scope">Authorized scope (YAML)</label>
+      <textarea id="scope" spellcheck="false">schema_version: "1.0"
+assessment_id: dashboard-demo
+targets:
+  allowed_hosts: ["mock-target-lab"]
+  allowed_subnets: ["172.16.0.0/12"]
+  denied_hosts: ["169.254.169.254", "127.0.0.1"]
+ports:
+  allowed_ports: [80, 8080]
+  denied_ports: [22, 25, 445]
+actions:
+  allowed_categories: ["network_recon", "web_crawl", "active_template_check"]
+network_policy:
+  redirect_policy: strict_same_host</textarea>
+
+      <div class="check">
+        <input id="simulation" type="checkbox" checked>
+        <label for="simulation" style="margin:0;text-transform:none;letter-spacing:0;font-size:12px">
+          Simulation mode (clearly labelled; never presented as a live assessment)
+        </label>
+      </div>
+      <button id="launch">Launch Assessment</button>
+      <button id="cancel" class="secondary" disabled>Request Cancellation</button>
+      <div class="mono" id="assessmentId" style="margin-top:12px"></div>
+    </section>
+
+    <section>
+      <div class="card">
+        <h2>Assessment State</h2>
+        <div class="status-row">
+          <span class="pill" id="statusPill">IDLE</span>
+          <span class="pill" id="outcomePill">No assessment yet</span>
+          <span class="pill" id="strategyPill">—</span>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="n" id="mAssets">0</div><div class="l">Assets</div></div>
+          <div class="metric"><div class="n" id="mServices">0</div><div class="l">Services</div></div>
+          <div class="metric"><div class="n" id="mFindings">0</div><div class="l">Findings</div></div>
+          <div class="metric"><div class="n" id="mEvidence">0</div><div class="l">Evidence</div></div>
+          <div class="metric"><div class="n" id="mBlocked">0</div><div class="l">Blocked</div></div>
+          <div class="metric"><div class="n" id="mIter">0</div><div class="l">Iterations</div></div>
+        </div>
+        <div class="links" id="reportLinks"></div>
+        <div class="empty" id="summary" style="margin-top:12px">Start an assessment to stream live node transitions.</div>
+      </div>
+
+      <div class="card section">
+        <h2>Verified Findings</h2>
+        <div id="findings"><div class="empty">No findings yet. Only evidence-backed findings are promoted.</div></div>
+      </div>
+
+      <div class="card section">
+        <h2>Live Execution Log</h2>
+        <div class="log" id="log"><div class="empty">Waiting for events…</div></div>
+      </div>
+
+      <div class="card section">
+        <h2>Scope Firewall</h2>
+        <div id="blocked"><div class="empty">No blocked actions.</div></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let currentId = null;
+let source = null;
+let poller = null;
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+function pillClass(status) {
+  if (!status) return "pill";
+  if (["SUCCESS", "COMPLETED"].includes(status)) return "pill ok";
+  if (["FAILED", "CANCELLED"].includes(status)) return "pill fail";
+  if (["PARTIAL_SUCCESS", "CANCELLING"].includes(status)) return "pill warn";
+  return "pill run";
+}
+
+function logLine(kind, text, cls) {
+  const log = $("log");
+  if (log.dataset.started !== "1") { log.innerHTML = ""; log.dataset.started = "1"; }
+  const time = new Date().toLocaleTimeString();
+  const div = document.createElement("div");
+  div.innerHTML = `<span class="t">[${time}]</span> <span class="${cls || ""}">${esc(text)}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function render(data) {
+  const state = data.state || {};
+  const terminal = data.is_terminal;
+  $("statusPill").textContent = data.status || "—";
+  $("statusPill").className = pillClass(data.status);
+  $("outcomePill").textContent = data.outcome ? `Outcome: ${data.outcome}` : "Outcome pending";
+  $("strategyPill").textContent = state.current_strategy || "—";
+  $("mAssets").textContent = (state.discovered_assets || []).length;
+  $("mServices").textContent = (state.discovered_services || []).length;
+  $("mFindings").textContent = (state.findings || []).length;
+  $("mEvidence").textContent = (state.evidence_refs || []).length;
+  $("mBlocked").textContent = (state.blocked_actions || []).length;
+  $("mIter").textContent = (state.budget || {}).iterations_used ?? 0;
+  $("summary").textContent = data.summary || (terminal ? "Assessment finished." : "Running…");
+
+  const findings = state.findings || [];
+  if (findings.length) {
+    $("findings").innerHTML = findings.map((f) => `
+      <div class="finding">
+        <div class="title">[${esc(f.severity || "INFO")}] ${esc(f.title || "Finding")}</div>
+        <div class="meta">${esc(f.confidence || f.status || "UNVERIFIED")} ·
+          ${esc(f.affected_asset || "unknown")} · evidence ${esc((f.evidence_ids || []).join(", ") || "none")}</div>
+        <div class="meta">${esc(f.verification_method || "No verification method")}</div>
+      </div>`).join("");
+  } else {
+    $("findings").innerHTML = '<div class="empty">No findings yet. Only evidence-backed findings are promoted.</div>';
+  }
+
+  const blocked = state.blocked_actions || [];
+  $("blocked").innerHTML = blocked.length ? blocked.map((a) => `
+    <div class="finding" style="border-left-color:#f5b64a">
+      <div class="title">${esc(a.tool_name || "action")} → ${esc(a.target_host || "unknown")}</div>
+      <div class="meta">${esc(a.denied_reason || a.reject_reason || "Blocked by policy")}</div>
+    </div>`).join("") : '<div class="empty">No blocked actions.</div>';
+
+  const links = [];
+  if (data.report_url) links.push(`<a href="${esc(data.report_url)}" target="_blank" rel="noopener">Markdown report</a>`);
+  if (data.report_pdf_url) links.push(`<a href="${esc(data.report_pdf_url)}" target="_blank" rel="noopener">PDF report</a>`);
+  links.push(`<a href="/api/v1/assessments/${esc(data.assessment_id)}/report?format=html" target="_blank" rel="noopener">HTML report</a>`);
+  $("reportLinks").innerHTML = links.join("");
+
+  $("cancel").disabled = terminal;
+  $("launch").disabled = !terminal;
+
+  if (terminal && poller) { clearInterval(poller); poller = null; }
+  if (terminal && source) { source.close(); source = null; }
+}
+
+async function fetchState(id) {
+  const res = await fetch(`/api/v1/assessments/${id}`);
+  if (!res.ok) return;
+  render(await res.json());
+}
+
+function connectEvents(id) {
+  if (source) source.close();
+  source = new EventSource(`/api/v1/assessments/${id}/events`);
+  const handler = (event) => {
+    let data = {};
+    try { data = JSON.parse(event.data); } catch (_) { data = { data: event.data }; }
+    if (event.type === "node_transition") {
+      logLine("node", `▶ ${data.node || "node"} · ${data.status || ""} · findings ${data.findings ?? 0} · evidence ${data.evidence ?? 0}`, "node");
+      if (data.latest_finding) logLine("finding", `✔ ${data.latest_finding}`, "ok");
+    } else if (event.type === "assessment_completed") {
+      logLine("done", `■ finished: ${data.outcome || data.status || "done"}`, "ok");
+    } else if (event.type === "assessment_failed") {
+      logLine("error", `✖ ${data.error || "assessment failed"}`, "bad");
+    } else if (event.type === "cancel_requested") {
+      logLine("cancel", "Cancellation requested; stopping at the next safe boundary.", "bad");
+    } else {
+      logLine("event", `${event.type}: ${JSON.stringify(data)}`);
+    }
+    fetchState(id);
+  };
+  ["assessment_created", "assessment_started", "node_transition",
+   "assessment_completed", "assessment_failed", "cancel_requested"].forEach((name) => {
+    source.addEventListener(name, handler);
+  });
+  source.onerror = () => { if (source) { source.close(); source = null; } };
+}
+
+$("launch").addEventListener("click", async () => {
+  const objective = $("objective").value;
+  const body = {
+    target: $("target").value.trim(),
+    scope: $("scope").value,
+    objective: objective === "severity_threshold"
+      ? { type: "severity_threshold", min_severity: "HIGH" }
+      : objective === "find_cve"
+        ? { find_cve: true, required_hosts: 1 }
+        : { type: "discover_services", required_hosts: 1 },
+    simulation: $("simulation").checked,
+    max_iterations: Number($("iterations").value) || 8,
+  };
+  $("log").dataset.started = "0";
+  $("log").innerHTML = '<div class="empty">Launching assessment…</div>';
+  $("launch").disabled = true;
+  try {
+    const res = await fetch("/api/v1/assessments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      logLine("error", `✖ ${data.detail || "launch failed"}`, "bad");
+      $("launch").disabled = false;
+      return;
+    }
+    currentId = data.assessment_id;
+    $("assessmentId").textContent = `Assessment ${currentId}`;
+    logLine("start", `Assessment ${currentId} accepted`, "ok");
+    render(data);
+    connectEvents(currentId);
+    poller = setInterval(() => fetchState(currentId), 1000);
+  } catch (err) {
+    logLine("error", `✖ ${err}`, "bad");
+    $("launch").disabled = false;
+  }
+});
+
+$("cancel").addEventListener("click", async () => {
+  if (!currentId) return;
+  await fetch(`/api/v1/assessments/${currentId}/cancel`, { method: "POST" });
+});
+
+fetch("/healthz").then((r) => r.json()).then((data) => {
+  $("modeBadge").textContent = data.status === "ok" ? "API ONLINE" : "API OFFLINE";
+});
+</script>
+</body>
+</html>
