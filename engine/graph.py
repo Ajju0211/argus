@@ -236,15 +236,17 @@ class AssessmentOrchestrator:
             max_concurrency=scope.rate_limits.max_concurrency,
         )
 
-        # Automatically use Bifrost Gateway if API key configured and no mock gateway injected
+        # Automatically use Bifrost Gateway if API key or admin credentials configured and no mock gateway injected
         if model_gateway is not None:
             self.model_gateway = model_gateway
-        elif settings.BIFROST_API_KEY:
+        elif settings.BIFROST_API_KEY or (settings.BIFROST_ADMIN_USERNAME and settings.BIFROST_ADMIN_PASSWORD):
             bifrost_client = BifrostClient(
                 api_key=settings.BIFROST_API_KEY,
                 base_url=settings.BIFROST_BASE_URL,
                 primary_model=settings.BIFROST_PRIMARY_MODEL,
                 fallback_model=settings.BIFROST_FALLBACK_MODEL,
+                admin_username=settings.BIFROST_ADMIN_USERNAME,
+                admin_password=settings.BIFROST_ADMIN_PASSWORD,
             )
             self.model_gateway = create_bifrost_model_gateway(bifrost_client)
         elif self.simulation_mode:

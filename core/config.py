@@ -9,7 +9,7 @@ Follows backend-patterns and 12-Factor App design:
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -65,6 +65,16 @@ class Settings(BaseSettings):
     BIFROST_API_KEY: str = Field(
         default="",
         description="Bifrost Virtual Key (e.g. sk-bf-* or sk-bf-local for self-hosted instances)",
+    )
+    BIFROST_ADMIN_USERNAME: str = Field(
+        default="",
+        validation_alias=AliasChoices("ARGUS_BIFROST_ADMIN_USERNAME", "BIFROST_ADMIN_USERNAME"),
+        description="Admin username for Bifrost HTTP Basic auth (e.g. admin)",
+    )
+    BIFROST_ADMIN_PASSWORD: str = Field(
+        default="",
+        validation_alias=AliasChoices("ARGUS_BIFROST_ADMIN_PASSWORD", "BIFROST_ADMIN_PASSWORD"),
+        description="Admin password for Bifrost HTTP Basic auth",
     )
     BIFROST_BASE_URL: str = Field(
         default="http://localhost:8080/v1",

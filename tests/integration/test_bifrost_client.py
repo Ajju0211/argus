@@ -184,3 +184,50 @@ class TestBifrostClient:
 
         with pytest.raises(BifrostAPIError, match="401"):
             await client.complete_structured(prompt="test", schema=AssessmentDecision)
+
+    @pytest.mark.asyncio
+    async def test_basic_auth_admin_credentials(self, sample_decision_json: str) -> None:
+        """Verifies admin_username and admin_password are base64-encoded as standard Basic auth."""
+        def handler(request: httpx.Request) -> httpx.Response:
+            # "admin:AdminPass123" in base64 is "YWRtaW46QWRtaW5QYXNzMTIz"
+            assert request.headers.get("Authorization") == "Basic YWRtaW46QWRtaW5QYXNzMTIz"
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [{"message": {"content": sample_decision_json}}],
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 10, "total_tokens": 20},
+                },
+            )
+
+        transport = httpx.MockTransport(handler)
+        client = BifrostClient(
+            admin_username="admin",
+            admin_password="AdminPass123",
+            transport=transport,
+        )
+        assert client.get_auth_header() == "Basic YWRtaW46QWRtaW5QYXNzMTIz"
+        decision, _ = await client.complete_structured(prompt="test", schema=AssessmentDecision)
+        assert decision.decision_type == DecisionType.EXECUTE_ACTION
+
+    @pytest.mark.asyncio
+    async def test_basic_auth_colon_separated_key(self, sample_decision_json: str) -> None:
+        """Verifies colon-separated api_key (e.g. 'operator:secret') is base64-encoded as Basic auth."""
+        def handler(request: httpx.Request) -> httpx.Response:
+            # "operator:secret" in base64 is "b3BlcmF0b3I6c2VjcmV0"
+            assert request.headers.get("Authorization") == "Basic b3BlcmF0b3I6c2VjcmV0"
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [{"message": {"content": sample_decision_json}}],
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 10, "total_tokens": 20},
+                },
+            )
+
+        transport = httpx.MockTransport(handler)
+        client = BifrostClient(
+            api_key="operator:secret",
+            transport=transport,
+        )
+        assert client.get_auth_header() == "Basic b3BlcmF0b3I6c2VjcmV0"
+        decision, _ = await client.complete_structured(prompt="test", schema=AssessmentDecision)
+        assert decision.decision_type == DecisionType.EXECUTE_ACTION

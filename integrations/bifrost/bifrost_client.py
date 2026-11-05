@@ -5,6 +5,7 @@ Bifrost Gateway with automated failover from Claude 3.5 Sonnet to GPT-4o,
 strict JSON parsing into typed Pydantic contracts, and telemetry accounting.
 """
 
+import base64
 import re
 import time
 from collections.abc import Callable
@@ -41,12 +42,14 @@ class BifrostClient:
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str = "",
         base_url: str = "https://bifrost.maxim.ai/v1",
         primary_model: str = "claude-3-5-sonnet-20241022",
         fallback_model: str = "gpt-4o",
         timeout_seconds: float = 60.0,
         transport: httpx.AsyncBaseTransport | None = None,
+        admin_username: str | None = None,
+        admin_password: str | None = None,
     ) -> None:
         self.api_key = api_key.strip()
         self.base_url = base_url.rstrip("/")
@@ -54,6 +57,29 @@ class BifrostClient:
         self.fallback_model = fallback_model
         self.timeout_seconds = timeout_seconds
         self._transport = transport
+        self.admin_username = (admin_username or "").strip()
+        self.admin_password = (admin_password or "").strip()
+
+    def get_auth_header(self) -> str:
+        """Constructs Authorization header using Basic Auth (admin username:password) or Bearer token."""
+        # 1. Explicit admin credentials (username:password)
+        if self.admin_username and self.admin_password:
+            raw = f"{self.admin_username}:{self.admin_password}".encode("utf-8")
+            encoded = base64.b64encode(raw).decode("ascii")
+            return f"Basic {encoded}"
+
+        # 2. Raw Basic auth header already provided in api_key
+        if self.api_key.startswith("Basic "):
+            return self.api_key
+
+        # 3. Colon-separated username:password provided in api_key
+        if ":" in self.api_key and not self.api_key.startswith("sk-"):
+            raw = self.api_key.encode("utf-8")
+            encoded = base64.b64encode(raw).decode("ascii")
+            return f"Basic {encoded}"
+
+        # 4. Standard Bearer token (virtual key)
+        return f"Bearer {self.api_key}" if self.api_key else ""
 
     def _clean_json_content(self, raw_content: str) -> str:
         """Removes markdown code fences and extraneous leading/trailing whitespace."""
@@ -83,19 +109,21 @@ class BifrostClient:
             BifrostAPIError: On non-200 HTTP responses.
             BifrostValidationError: If response cannot be validated against schema.
         """
-        if not self.api_key:
+        auth_header = self.get_auth_header()
+        if not auth_header:
             raise BifrostAPIError(
                 401,
-                "Missing Bifrost API key. Set ARGUS_BIFROST_API_KEY in environment "
-                "(use your Bifrost virtual key or 'sk-bf-local' when self-hosting).",
+                "Missing Bifrost authentication credentials. Set ARGUS_BIFROST_API_KEY (virtual key or username:password) "
+                "or ARGUS_BIFROST_ADMIN_USERNAME and ARGUS_BIFROST_ADMIN_PASSWORD in environment.",
             )
 
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "x-bf-vk": self.api_key,
+        headers: dict[str, str] = {
+            "Authorization": auth_header,
             "X-Bifrost-Fallback": self.fallback_model,
             "Content-Type": "application/json",
         }
+        if auth_header.startswith("Bearer "):
+            headers["x-bf-vk"] = self.api_key
 
         messages: list[dict[str, str]] = []
         if system_prompt:
