@@ -54,7 +54,9 @@ The Geek Room / Global AI Hackathon 2026 (Track A: Challenge 03) establishes spe
 - Denial-of-Service (DoS), stress testing, or resource exhaustion.
 - Automated credential theft, dictionary brute-forcing, or password cracking.
 - Malware deployment, reverse shells, or persistence mechanisms.
-- Complex autonomous lateral movement across internal subnets.
+- Unbounded or unauthorized lateral movement across internal subnets. Bounded,
+  explicitly authorized multi-step verification (the `authorized_chain` scope
+  envelope) is permitted; see Module 01 and Module 02.
 - Distributed microservices, Kubernetes clusters, Celery, or Redis.
 - Multi-agent swarm architectures.
 
@@ -77,7 +79,7 @@ The Geek Room / Global AI Hackathon 2026 (Track A: Challenge 03) establishes spe
                               │
 ┌─────────────────────────────▼─────────────────────────────┐
 │ P2 (Post-Hackathon Roadmap)                               │
-│ • Autonomous Lateral Movement   • Team Collaboration/RBAC │
+│ • Unbounded Lateral Movement    • Team Collaboration/RBAC │
 │ • Enterprise CI/CD Integrations • Scheduled Re-Testing    │
 └───────────────────────────────────────────────────────────┘
 ```

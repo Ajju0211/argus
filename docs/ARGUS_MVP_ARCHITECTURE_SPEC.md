@@ -3,7 +3,7 @@
 
 **Document Status:** Gated Specification (Phase 1: Specify)  
 **Target Event:** Geek Room / Global AI Hackathon 2026 (Track A: Challenge 03 — Autonomous Pentesting Agent)  
-**Timeline:** 1–15 November 2026 (11-Day Build Window)  
+**Timeline:** 1–15 November 2026 submission window (implementation sprint 4–15 November 2026)  
 **Team Composition:** 2 Engineers (Dev 1: Security Engine & LangGraph / Dev 2: Platform, API & Dashboard)  
 **Target Environment:** macOS (Apple Silicon M1 Pro, 16 GB RAM) + Docker Desktop Isolated Runtime  
 **Mandatory Integrations:** Bifrost (Maxim AI) & Tavily Search API  
@@ -201,29 +201,32 @@ flowchart TD
 ```python
 from typing import TypedDict, List, Dict, Any, Optional
 
+
 class AssessmentState(TypedDict):
     assessment_id: str
-    target: Dict[str, Any]             # {"type": "web" | "network", "value": "http://lab:8080"}
+    target: Dict[str, Any]  # {"type": "web" | "network", "value": "http://lab:8080"}
     scope_id: str
     scope_version: str
-    status: str                         # DRAFT | VALIDATING | READY | RUNNING | COMPLETED | FAILED
-    
+    status: str  # DRAFT | VALIDATING | READY | RUNNING | COMPLETED | FAILED
+
     # Topology & Recon Data
-    discovered_assets: List[str]        # ["192.168.50.2", "web.lab.local"]
-    discovered_services: List[Dict[str, Any]] # [{"port": 80, "service": "http", "version": "Apache 2.4.49"}]
+    discovered_assets: List[str]  # ["192.168.50.2", "web.lab.local"]
+    discovered_services: List[
+        Dict[str, Any]
+    ]  # [{"port": 80, "service": "http", "version": "Apache 2.4.49"}]
     observations: List[Dict[str, Any]]  # Normalized observation structures
-    research_refs: List[Dict[str, Any]] # Tavily retrieved CVE articles & advisories
-    
+    research_refs: List[Dict[str, Any]]  # Tavily retrieved CVE articles & advisories
+
     # Planning & Execution State
     test_plan: List[Dict[str, Any]]
     current_action: Optional[Dict[str, Any]]
     executed_actions: List[Dict[str, Any]]
     blocked_actions: List[Dict[str, Any]]
-    
+
     # Findings & Integrity
-    evidence_refs: List[Dict[str, Any]] # Hashed references to raw disk logs
-    findings: List[Dict[str, Any]]      # Verified & potential findings
-    
+    evidence_refs: List[Dict[str, Any]]  # Hashed references to raw disk logs
+    findings: List[Dict[str, Any]]  # Verified & potential findings
+
     # Execution Budgets & Recovery
     current_iteration: int
     max_iterations: int
@@ -310,21 +313,33 @@ class PolicyEngine:
         # 2. Target IP & Hostname Gating
         target_ip = self._resolve_and_verify_ip(proposal.target_host)
         if not target_ip or not self._is_ip_in_scope(target_ip):
-            return PolicyDecision(approved=False, reason=f"Target {proposal.target_host} ({target_ip}) is out of scope.")
+            return PolicyDecision(
+                approved=False,
+                reason=f"Target {proposal.target_host} ({target_ip}) is out of scope.",
+            )
 
         # 3. Port Allowlist Check
         if proposal.target_port not in self.scope.ports.allowed_ports:
-            return PolicyDecision(approved=False, reason=f"Port {proposal.target_port} is not permitted.")
+            return PolicyDecision(
+                approved=False, reason=f"Port {proposal.target_port} is not permitted."
+            )
 
         # 4. Action Category & Tool Allowlist Check
         if proposal.action_category in self.scope.actions.prohibited_categories:
-            return PolicyDecision(approved=False, reason=f"Action category {proposal.action_category} is prohibited.")
+            return PolicyDecision(
+                approved=False, reason=f"Action category {proposal.action_category} is prohibited."
+            )
         if proposal.action_category not in self.scope.actions.allowed_categories:
-            return PolicyDecision(approved=False, reason=f"Action category {proposal.action_category} not in allowed list.")
+            return PolicyDecision(
+                approved=False,
+                reason=f"Action category {proposal.action_category} not in allowed list.",
+            )
 
         # 5. Dangerous Command Argument Scrubbing
         if not self._validate_tool_arguments(proposal.tool_name, proposal.arguments):
-            return PolicyDecision(approved=False, reason="Arguments contain forbidden flags or malformed patterns.")
+            return PolicyDecision(
+                approved=False, reason="Arguments contain forbidden flags or malformed patterns."
+            )
 
         return PolicyDecision(approved=True, reason="Authorized by scope policy.")
 ```
@@ -341,13 +356,15 @@ from abc import ABC, abstractmethod
 from pydantic import BaseModel
 from typing import Dict, Any, List
 
+
 class NormalizedObservation(BaseModel):
     tool: str
     target: str
-    observation_type: str # host_discovery | open_port | service_version | vuln_signature
+    observation_type: str  # host_discovery | open_port | service_version | vuln_signature
     data: Dict[str, Any]
     severity_hint: Optional[str]
     raw_evidence_id: str
+
 
 class ToolAdapter(ABC):
     @property
@@ -392,16 +409,16 @@ To prevent the common hackathon pitfall of "invented" findings:
 - Each file has an immutable SHA-256 calculated on write:
 ```python
 class EvidenceArtifact(BaseModel):
-    evidence_id: str             # e.g., "ev-20261104-a1b2c3"
+    evidence_id: str  # e.g., "ev-20261104-a1b2c3"
     assessment_id: str
     tool_name: str
     tool_version: str
     command_executed: str
-    sha256: str                  # Cryptographic integrity digest
+    sha256: str  # Cryptographic integrity digest
     file_path: str
     captured_at: datetime
-    content_type: str            # "application/xml", "application/json", "text/plain"
-    redacted: bool               # True if passwords/tokens were detected and masked
+    content_type: str  # "application/xml", "application/json", "text/plain"
+    redacted: bool  # True if passwords/tokens were detected and masked
 ```
 
 ### 7.2 Finding Verification Engine (`finding_verifier.py`)
@@ -428,8 +445,10 @@ ARGUS does not call OpenAI or Anthropic SDKs directly. All requests pass through
 ```python
 class BifrostClient:
     """Enterprise model gateway integration supporting multi-provider fallback and cost auditing."""
-    
-    def __init__(self, api_key: str, default_model: str = "claude-3-5-sonnet", fallback_model: str = "gpt-4o"):
+
+    def __init__(
+        self, api_key: str, default_model: str = "claude-3-5-sonnet", fallback_model: str = "gpt-4o"
+    ):
         self.api_key = api_key
         self.default_model = default_model
         self.fallback_model = fallback_model
@@ -437,7 +456,10 @@ class BifrostClient:
 
     async def complete_structured(self, prompt: str, schema: Type[BaseModel]) -> BaseModel:
         # Route through Bifrost with auto-fallback configuration
-        headers = {"Authorization": f"Bearer {self.api_key}", "X-Bifrost-Fallback": self.fallback_model}
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "X-Bifrost-Fallback": self.fallback_model,
+        }
         # Logs latency, provider name, and cost per call into SQLite assessment_events
 ```
 

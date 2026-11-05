@@ -32,7 +32,7 @@ To maximize execution velocity during the 11-day hackathon window, responsibilit
 
 ---
 
-## 2. Eleven-Day Execution Schedule (Nov 4 – Nov 15)
+## 2. Eleven-Day Execution Schedule (Nov 4 – Nov 15, within the Nov 1–15 submission window)
 
 ```mermaid
 gantt

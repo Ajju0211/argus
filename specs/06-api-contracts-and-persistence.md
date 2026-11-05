@@ -47,14 +47,17 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
+
 class AssessmentTarget(BaseModel):
     type: str = Field(description="Target type: 'web' or 'network'")
     value: str = Field(description="URL or IP, e.g. 'http://192.168.100.5:8080'")
+
 
 class AssessmentLimits(BaseModel):
     max_duration_seconds: int = Field(default=1800)
     max_iterations: int = Field(default=15)
     max_concurrency: int = Field(default=2)
+
 
 class AssessmentCreate(BaseModel):
     name: str
@@ -62,6 +65,7 @@ class AssessmentCreate(BaseModel):
     scope_yaml: str
     objective: str
     limits: Optional[AssessmentLimits] = None
+
 
 class AssessmentDetail(BaseModel):
     id: str

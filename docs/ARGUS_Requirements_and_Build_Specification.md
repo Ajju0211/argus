@@ -983,21 +983,25 @@ the others.
 
 ## 15.2 Required test scenarios
 
-1.  Valid scope permits an authorized discovery action.
-2.  Invalid or expired scope prevents all tool execution.
-3.  Out-of-scope hostname or IP is blocked.
-4.  DNS resolution to an unauthorized IP is blocked.
-5.  Redirect to an out-of-scope destination is blocked.
-6.  Tool timeout is recorded and handled.
-7.  Malformed tool output does not crash the assessment.
-8.  Repeated failed action is bounded.
-9.  Irrelevant CVE research does not become a confirmed finding.
-10. False-positive scanner result is rejected or marked unverified.
-11. Bifrost provider failure triggers fallback or safe pause.
-12. All model providers unavailable preserves state and stops safely.
-13. Cancellation terminates active tool processes.
-14. Iteration/time limit produces a partial report.
-15. Every confirmed finding has evidence and a verification method.
+The authoritative matrix is maintained in
+[`specs/08-testing-evaluation-and-labs.md`](../specs/08-testing-evaluation-and-labs.md).
+The fifteen release-blocking scenarios are:
+
+1.  `test_authorized_recon_pass` — valid scope permits an authorized discovery action.
+2.  `test_expired_scope_blocks_all` — invalid or expired scope prevents all tool execution.
+3.  `test_out_of_scope_ip_blocked` — an out-of-scope hostname or IP is blocked.
+4.  `test_gateway_ip_protected` — the subnet gateway address is denied by default.
+5.  `test_ssrf_metadata_blocked` — DNS resolution to cloud metadata/link-local fails closed.
+6.  `test_redirect_outside_scope` — a redirect to an out-of-scope destination is blocked.
+7.  `test_prohibited_action_category` — a prohibited action category is rejected.
+8.  `test_tool_timeout_recovery` — a tool timeout is recorded and enters recovery.
+9.  `test_malformed_output_resilience` — malformed output does not crash the assessment.
+10. `test_bounded_retry_limit` — a repeated failed action is retried within a bound.
+11. `test_bifrost_provider_failover` — a provider failure triggers fallback or safe pause.
+12. `test_all_providers_down_pause` — all providers unavailable preserves state and stops safely.
+13. `test_user_cancellation_cleanup` — cancellation terminates active tool processes.
+14. `test_partial_report_on_budget` — an iteration/time limit produces a partial report.
+15. `test_evidence_digest_completeness` — every confirmed finding has evidence and a verification method.
 
 ## 15.3 Evaluation metrics
 

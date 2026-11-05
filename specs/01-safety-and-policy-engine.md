@@ -106,6 +106,11 @@ flowchart TD
 
 ## 4. Deterministic Policy Implementation (`core/policy/policy_engine.py`)
 
+> **Note:** The snippet below is illustrative pseudocode. The executable
+> implementation in `core/policy/policy_engine.py` is the source of truth and
+> includes a fail-closed wrapper, resolved-IP pinning, port-set expansion,
+> protocol checks, redirect validation, and bounded chain authorization.
+
 ```python
 import ipaddress
 import socket
@@ -113,10 +118,12 @@ from datetime import datetime
 from typing import NamedTuple, Optional
 from core.scope.schema import ScopeDocument, ActionProposal
 
+
 class PolicyDecision(NamedTuple):
     approved: bool
     reason: str
     resolved_ip: Optional[str] = None
+
 
 class PolicyEngine:
     def __init__(self, scope: ScopeDocument):
@@ -139,30 +146,45 @@ class PolicyEngine:
 
         ip_obj = ipaddress.ip_address(resolved_ip)
         if ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved:
-            return PolicyDecision(False, f"Target {resolved_ip} is a reserved/link-local address (SSRF guard).")
+            return PolicyDecision(
+                False, f"Target {resolved_ip} is a reserved/link-local address (SSRF guard)."
+            )
 
         in_subnet = any(ip_obj in subnet for subnet in self._parsed_subnets)
-        in_hosts = proposal.target_host in self.scope.targets.allowed_hosts or resolved_ip in self.scope.targets.allowed_hosts
+        in_hosts = (
+            proposal.target_host in self.scope.targets.allowed_hosts
+            or resolved_ip in self.scope.targets.allowed_hosts
+        )
 
         if not (in_subnet or in_hosts):
-            return PolicyDecision(False, f"Target {proposal.target_host} ({resolved_ip}) is outside allowed targets.")
+            return PolicyDecision(
+                False, f"Target {proposal.target_host} ({resolved_ip}) is outside allowed targets."
+            )
 
         # 3. Port Check
         if proposal.target_port is not None:
             if proposal.target_port in self.scope.ports.denied_ports:
                 return PolicyDecision(False, f"Port {proposal.target_port} is explicitly denied.")
             if proposal.target_port not in self.scope.ports.allowed_ports:
-                return PolicyDecision(False, f"Port {proposal.target_port} is not in allowed ports.")
+                return PolicyDecision(
+                    False, f"Port {proposal.target_port} is not in allowed ports."
+                )
 
         # 4. Action Category Check
         if proposal.action_category in self.scope.actions.prohibited_categories:
-            return PolicyDecision(False, f"Action category '{proposal.action_category}' is explicitly prohibited.")
+            return PolicyDecision(
+                False, f"Action category '{proposal.action_category}' is explicitly prohibited."
+            )
         if proposal.action_category not in self.scope.actions.allowed_categories:
-            return PolicyDecision(False, f"Action category '{proposal.action_category}' is not in allowed categories.")
+            return PolicyDecision(
+                False, f"Action category '{proposal.action_category}' is not in allowed categories."
+            )
 
-        # 5. Argument Scrubbing
-        if not self._verify_arguments(proposal.tool_name, proposal.arguments):
-            return PolicyDecision(False, "Arguments contain forbidden flags or malformed shell tokens.")
+        # 5. Argument Scrubbing (implementation signature: _verify_arguments(args))
+        if not self._verify_arguments(proposal.arguments):
+            return PolicyDecision(
+                False, "Arguments contain forbidden flags or malformed shell tokens."
+            )
 
         return PolicyDecision(True, "Action approved by policy engine.", resolved_ip=resolved_ip)
 
@@ -172,7 +194,7 @@ class PolicyEngine:
         except socket.error:
             return None
 
-    def _verify_arguments(self, tool: str, args: dict) -> bool:
+    def _verify_arguments(self, args: dict) -> bool:
         forbidden_tokens = [";", "&&", "||", "`", "$(", ">", "<", "|", "--exec", "--script=vuln"]
         for val in args.values():
             s_val = str(val)

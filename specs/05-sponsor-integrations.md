@@ -43,13 +43,14 @@ from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
 
+
 class BifrostClient:
     def __init__(
         self,
         api_key: str,
         base_url: str = "https://bifrost.maxim.ai/v1",
         primary_model: str = "claude-3-5-sonnet-20241022",
-        fallback_model: str = "gpt-4o"
+        fallback_model: str = "gpt-4o",
     ):
         self.api_key = api_key
         self.base_url = base_url
@@ -61,18 +62,20 @@ class BifrostClient:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "X-Bifrost-Fallback": self.fallback_model,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
         payload = {
             "model": self.primary_model,
             "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_object"},
-            "temperature": 0.1
+            "temperature": 0.1,
         }
 
         start_time = time.perf_counter()
         async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=payload)
+            resp = await client.post(
+                f"{self.base_url}/chat/completions", headers=headers, json=payload
+            )
             resp.raise_for_status()
 
         latency_ms = int((time.perf_counter() - start_time) * 1000)
@@ -89,7 +92,8 @@ class BifrostClient:
             "prompt_tokens": data["usage"]["prompt_tokens"],
             "completion_tokens": data["usage"]["completion_tokens"],
             "latency_ms": latency_ms,
-            "fallback_triggered": resp.headers.get("X-Bifrost-Fallback-Triggered", "false") == "true"
+            "fallback_triggered": resp.headers.get("X-Bifrost-Fallback-Triggered", "false")
+            == "true",
         }
 
         return structured_obj, telemetry
@@ -108,6 +112,7 @@ from pydantic import BaseModel
 from typing import List
 from datetime import datetime
 
+
 class ResearchSource(BaseModel):
     source_id: str
     query: str
@@ -116,6 +121,7 @@ class ResearchSource(BaseModel):
     snippet: str
     score: float
     retrieved_at: datetime
+
 
 class TavilyIntelService:
     def __init__(self, api_key: str):
@@ -126,21 +132,29 @@ class TavilyIntelService:
         response = await self.client.search(
             query=query,
             search_depth="advanced",
-            include_domains=["nvd.nist.gov", "cve.mitre.org", "exploit-db.com", "github.com", "apache.org"],
-            max_results=5
+            include_domains=[
+                "nvd.nist.gov",
+                "cve.mitre.org",
+                "exploit-db.com",
+                "github.com",
+                "apache.org",
+            ],
+            max_results=5,
         )
 
         sources = []
         for idx, result in enumerate(response.get("results", [])):
-            sources.append(ResearchSource(
-                source_id=f"tavily-{product}-{version}-{idx}",
-                query=query,
-                url=result["url"],
-                title=result["title"],
-                snippet=result["content"][:400],
-                score=result.get("score", 0.0),
-                retrieved_at=datetime.utcnow()
-            ))
+            sources.append(
+                ResearchSource(
+                    source_id=f"tavily-{product}-{version}-{idx}",
+                    query=query,
+                    url=result["url"],
+                    title=result["title"],
+                    snippet=result["content"][:400],
+                    score=result.get("score", 0.0),
+                    retrieved_at=datetime.utcnow(),
+                )
+            )
         return sources
 ```
 

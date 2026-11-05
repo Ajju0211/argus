@@ -37,18 +37,19 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, Dict, Any
 
+
 class EvidenceArtifact(BaseModel):
-    evidence_id: str             # e.g., "ev-20261104-a1b2c3"
+    evidence_id: str  # e.g., "ev-20261104-a1b2c3"
     assessment_id: str
-    tool_name: str               # "nmap" | "zap" | "nuclei" | "http_probe"
-    tool_version: str            # "nmap-7.94"
-    command_executed: str        # Redacted command string
-    sha256: str                  # Cryptographic SHA-256 hex digest
-    file_path: str               # Local disk path
+    tool_name: str  # "nmap" | "zap" | "nuclei" | "http_probe"
+    tool_version: str  # "nmap-7.94"
+    command_executed: str  # Redacted command string
+    sha256: str  # Cryptographic SHA-256 hex digest
+    file_path: str  # Local disk path
     captured_at: datetime
-    content_type: str            # "application/xml" | "application/json" | "text/plain"
-    redacted: bool               # True if sensitive tokens were masked
-    metadata: Dict[str, Any]     # Target, port, status code, latency
+    content_type: str  # "application/xml" | "application/json" | "text/plain"
+    redacted: bool  # True if sensitive tokens were masked
+    metadata: Dict[str, Any]  # Target, port, status code, latency
 ```
 
 ---
@@ -62,17 +63,20 @@ from pathlib import Path
 from datetime import datetime
 
 SECRET_PATTERNS = [
-    re.compile(r'(?i)(bearer\s+)[a-zA-Z0-9_\-\.]{20,}'),
-    re.compile(r'(?i)(password\s*[:=]\s*)[^\s&,;]{3,}'),
-    re.compile(r'(?i)(apikey\s*[:=]\s*)[a-zA-Z0-9_\-]{20,}'),
-    re.compile(r'(?i)(authorization:\s*basic\s+)[a-zA-Z0-9+/=]+')
+    re.compile(r"(?i)(bearer\s+)[a-zA-Z0-9_\-\.]{20,}"),
+    re.compile(r"(?i)(password\s*[:=]\s*)[^\s&,;]{3,}"),
+    re.compile(r"(?i)(apikey\s*[:=]\s*)[a-zA-Z0-9_\-]{20,}"),
+    re.compile(r"(?i)(authorization:\s*basic\s+)[a-zA-Z0-9+/=]+"),
 ]
+
 
 class EvidenceVault:
     def __init__(self, base_dir: Path):
         self.base_dir = base_dir
 
-    def store_artifact(self, assessment_id: str, tool_name: str, raw_content: str, cmd: str) -> EvidenceArtifact:
+    def store_artifact(
+        self, assessment_id: str, tool_name: str, raw_content: str, cmd: str
+    ) -> EvidenceArtifact:
         # 1. Redact Sensitive Tokens
         redacted_content, was_redacted = self._redact_secrets(raw_content)
 
@@ -98,7 +102,7 @@ class EvidenceVault:
             captured_at=datetime.utcnow(),
             content_type="text/plain",
             redacted=was_redacted,
-            metadata={"file_size_bytes": len(redacted_content)}
+            metadata={"file_size_bytes": len(redacted_content)},
         )
 
     def _redact_secrets(self, text: str) -> tuple[str, bool]:
@@ -106,7 +110,7 @@ class EvidenceVault:
         changed = False
         for pattern in SECRET_PATTERNS:
             if pattern.search(redacted):
-                redacted = pattern.sub(r'\1[REDACTED_BY_ARGUS]', redacted)
+                redacted = pattern.sub(r"\1[REDACTED_BY_ARGUS]", redacted)
                 changed = True
         return redacted, changed
 ```
@@ -134,21 +138,24 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
+
 class Finding(BaseModel):
-    finding_id: str              # "find-20261104-01"
+    finding_id: str  # "find-20261104-01"
     assessment_id: str
-    title: str                   # "Path Traversal in Apache HTTP Server (CVE-2021-41773)"
-    description: str             # Detailed technical description
-    severity: str                # "INFORMATIONAL" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
-    confidence: str              # "CONFIRMED" | "POTENTIAL" | "REJECTED" | "UNVERIFIABLE"
-    affected_asset: str          # "http://192.168.100.5:8080"
-    affected_service: str        # "Apache 2.4.49"
-    verification_method: str     # "Nuclei CVE-2021-41773 template match with HTTP 200 /etc/passwd disclosure"
-    reproduction_steps: str      # Exact curl command to reproduce safely
-    impact: str                  # Technical & business risk
-    remediation: str             # Tavily-sourced patch guidance
-    evidence_ids: List[str]      # Hashed links to raw evidence files
-    research_source_ids: List[str] # Tavily citation IDs
+    title: str  # "Path Traversal in Apache HTTP Server (CVE-2021-41773)"
+    description: str  # Detailed technical description
+    severity: str  # "INFORMATIONAL" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+    confidence: str  # "CONFIRMED" | "POTENTIAL" | "REJECTED" | "UNVERIFIABLE"
+    affected_asset: str  # "http://192.168.100.5:8080"
+    affected_service: str  # "Apache 2.4.49"
+    verification_method: (
+        str  # "Nuclei CVE-2021-41773 template match with HTTP 200 /etc/passwd disclosure"
+    )
+    reproduction_steps: str  # Exact curl command to reproduce safely
+    impact: str  # Technical & business risk
+    remediation: str  # Tavily-sourced patch guidance
+    evidence_ids: List[str]  # Hashed links to raw evidence files
+    research_source_ids: List[str]  # Tavily citation IDs
     created_at: datetime
 ```
 

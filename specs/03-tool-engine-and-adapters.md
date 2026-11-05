@@ -28,13 +28,15 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 
+
 class NormalizedObservation(BaseModel):
-    tool: str                          # "nmap" | "zap" | "nuclei"
-    target: str                        # "192.168.100.5" or "http://lab:8080"
-    observation_type: str              # "host_discovered" | "open_port" | "service_version" | "vuln_candidate"
-    data: Dict[str, Any]               # Parsed attributes (port, service, banner, cve, url)
-    severity_hint: Optional[str]       # "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
-    raw_evidence_id: str               # Pointer to the raw SHA-256 artifact
+    tool: str  # "nmap" | "zap" | "nuclei"
+    target: str  # "192.168.100.5" or "http://lab:8080"
+    observation_type: str  # "host_discovered" | "open_port" | "service_version" | "vuln_candidate"
+    data: Dict[str, Any]  # Parsed attributes (port, service, banner, cve, url)
+    severity_hint: Optional[str]  # "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+    raw_evidence_id: str  # Pointer to the raw SHA-256 artifact
+
 
 class ToolAdapter(ABC):
     @property
@@ -119,11 +121,10 @@ WORKDIR /home/argusrunner
 ```python
 import asyncio
 
+
 async def run_tool_process(cmd: List[str], timeout_seconds: int) -> tuple[int, str, str]:
     proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
     try:
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
