@@ -29,7 +29,7 @@ docker compose up --build
 | **Cyber Command Dashboard** | `http://localhost:3000` | Next.js 15 / React 19 UI with real-time SSE telemetry, killchain HUD, and evidence inspector |
 | **Bifrost AI Gateway (OSS)** | `http://localhost:8080` | Self-hosted Maxim AI Bifrost Web UI, provider management, and live request logs |
 | **FastAPI Core Backend** | `http://localhost:8000` | REST API, OpenAPI Swagger docs at `/docs`, checkpointing, and LangGraph runner |
-| **Mock Vulnerable Target Lab** | `http://localhost:5000` | Isolated Apache 2.4.49 path-traversal target for safe pentest demonstrations |
+| **Mock Vulnerable Target Lab** | `http://localhost:8888` | Isolated Apache 2.4.49 path-traversal target for safe pentest demonstrations |
 
 ---
 
@@ -156,7 +156,7 @@ docker compose up --build
 #### Step 4: Access the Command Center
 - Open `http://localhost:3000` to view the **Cyber Command Dashboard**.
 - Open `http://localhost:8080` to view the **Bifrost Gateway Web UI**.
-- Click **"New Assessment"** in the dashboard and enter target `http://localhost:5000` with scope `127.0.0.1/32` or `192.168.100.0/24`.
+- Click **"New Assessment"** in the dashboard and enter target `http://localhost:8888` (or use the pre-loaded "Judge Lab Demo Assessment" preset).
 - Click **"Engage Agent"** to watch the autonomous ReAct reasoning loop operate live.
 
 ---

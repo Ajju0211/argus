@@ -52,7 +52,7 @@ To understand ARGUS completely, let's look through the eyes of the 5 key persona
 - **What they see:** A sleek, dark-mode **Cyber Command Center** (`http://localhost:3000`).
 - **What they do:** 
   1. Click **"New Assessment"**.
-  2. Input the target (e.g., `http://localhost:5000` or `192.168.1.50`), specify the allowed CIDR subnet, and pick a safety tier (`Safe`, `Standard`, or `Aggressive`).
+  2. Input the target (e.g., `http://localhost:8888` or `192.168.1.50`), specify the allowed CIDR subnet, and pick a safety tier (`Safe`, `Standard`, or `Aggressive`).
   3. Hit **"Engage Agent"**.
 - **The Experience:** The screen transforms into a live terminal HUD. They see the AI agent's internal monologue, the active state machine node (Reconnaissance ➡️ Probing ➡️ Exploitation ➡️ Verification), and findings pop up live with CVSS scores. If anything looks concerning, they hit the big red **"Pause"** or **"Emergency Abort"** button.
 
@@ -204,14 +204,14 @@ A common misconception when first viewing an agent architecture is to think of i
 Here is how the reasoning loop works across 4 distinct iterations during an assessment against a web application:
 
 #### **Iteration 1: Surface Discovery & Reconnaissance**
-- **Action (Act):** Initial port discovery scans the target `http://localhost:5000`.
-- **Observation:** Port 5000 is open, serving HTTP with a `Werkzeug/3.0 Python` server banner.
+- **Action (Act):** Initial port discovery scans the target `http://localhost:8888`.
+- **Observation:** Port 8888 is open, serving HTTP with a `Werkzeug/3.0 Python` server banner.
 - **Loop Evaluation:** Objective not met yet (we haven't found or verified any vulnerabilities). **Loop back to `plan_action`!**
 
 #### **Iteration 2: Endpoint Enumeration & Hypothesis Formulation**
 - **Reasoning (Think):** The LLM receives the observation from Iteration 1. It reasons:  
-  > *"We have an HTTP service on port 5000. Before attacking, I need to know what endpoints exist. I will call `http_probe` to crawl common routes."*
-- **Policy Gate:** Firewall inspects `http_probe` against `http://localhost:5000`. Permitted.
+  > *"We have an HTTP service on port 8888. Before attacking, I need to know what endpoints exist. I will call `http_probe` to crawl common routes."*
+- **Policy Gate:** Firewall inspects `http_probe` against `http://localhost:8888`. Permitted.
 - **Action (Act):** Probe crawls routes and discovers `/api/v1/search?q=` and `/login`.
 - **Observation:** Endpoint `/api/v1/search` reflects user input in JSON output.
 - **Loop Evaluation:** We have endpoints, but no confirmed vulnerability. **Loop back to `plan_action`!**
@@ -257,10 +257,10 @@ Here is the exact step-by-step journey of what happens inside the computer when 
 ```
 [User on Next.js UI]
        │
-       ▼ (1) Click "Launch Assessment" (Target: http://localhost:5000)
+       ▼ (1) Click "Launch Assessment" (Target: http://localhost:8888)
 [FastAPI: POST /api/v1/assessments]
        │
-       ▼ (2) Policy Firewall checks: Is localhost:5000 in scope? (YES)
+       ▼ (2) Policy Firewall checks: Is localhost:8888 in scope? (YES)
 [SQLite WAL Database]
        │ Records assessment row (Status: RUNNING)
        ▼ (3) Spawns background worker thread
@@ -327,12 +327,12 @@ Here is the exact network map:
 │   │ - Database: argus.db (SQLite WAL)                             │    │
 │   │ - Interactive Swagger Docs: http://localhost:8000/docs        │    │
 │   │ - Routes LLM reasoning prompts via Bifrost (:8080)            │    │
-│   │ - Attacks target via HTTP: http://localhost:5000               │    │
+│   │ - Attacks target via HTTP: http://localhost:8888               │    │
 │   └──────────────┬────────────────────────────────┬───────────────┘    │
 │                  │                                │                    │
 │                  ▼                                ▼                    │
 │   ┌───────────────────────────────┐┌──────────────────────────────┐    │
-│   │ Bifrost OSS Gateway (Port 8080││ Mock Target Lab (Port 5000)  │    │
+│   │ Bifrost OSS Gateway (Port 8080││ Mock Target Lab (Port 8888)  │    │
 │   │ - Server: Go (maximhq/bifrost)││ - Vulnerable fixture         │    │
 │   │ - Web UI: Live logs & metrics ││ - Safe Apache 2.4.49 target  │    │
 │   │ - Auto-fails over to GPT-4o   ││ - Bound to private network   │    │
@@ -351,18 +351,18 @@ Here is the exact network map:
    - FastAPI keeps this connection open and pushes small JSON text chunks every time a log message or node transition occurs.
    - The browser's `EventSource` receives these chunks and updates the HUD in milliseconds without page refreshes.
 3. **Backend to Target:**
-   - When the agent runs tool queries (like `HttpProbeTool`), the Python backend creates an HTTP request directed at `http://localhost:5000`.
-   - The Policy Firewall evaluates the request destination before it leaves Python. If the IP is permitted, the request is sent to port 5000.
+   - When the agent runs tool queries (like `HttpProbeTool`), the Python backend creates an HTTP request directed at `http://localhost:8888`.
+   - The Policy Firewall evaluates the request destination before it leaves Python. If the IP is permitted, the request is sent to port 8888 (internally resolved to `mock-target-lab:8080` in Docker).
 4. **Docker Container Networking:**
-   - In Docker Compose, all three containers live on a shared internal bridge network (`argus-network`).
-   - Containers can talk to each other using their service names (`argus-api`, `argus-dashboard`, `mock-target-lab`) while also exposing ports `3000`, `8000`, and `5000` to your host machine.
+   - In Docker Compose, all containers live on a shared internal bridge network (`argus-lab`).
+   - Containers talk to each other using their service names (`argus-api`, `argus-dashboard`, `mock-target-lab`, `bifrost`) while exposing ports `3000`, `8000`, `8080`, and `8888` to your host machine.
 
 ---
 
 ## 8. How to Run Everything (Quickstart)
 
 ### Method A: The One-Command Turnkey Way (Docker)
-This starts all three services in isolated, production-ready containers:
+This starts all services in isolated, production-ready containers:
 
 ```bash
 # 1. Enter the project root
@@ -374,9 +374,10 @@ cp .env.example .env
 # 3. Boot all services
 docker compose up --build
 ```
-- Open `http://localhost:3000` to see the **Dashboard**.
+- Open `http://localhost:3000` to see the **Cyber Command Dashboard**.
+- Open `http://localhost:8080` to see the **Bifrost OSS Web UI Gateway**.
 - Open `http://localhost:8000/docs` to see the **FastAPI Swagger API Documentation**.
-- Open `http://localhost:5000` to see the **Mock Target Lab**.
+- Open `http://localhost:8888` to see the **Mock Target Lab**.
 
 ---
 
@@ -390,7 +391,6 @@ If you prefer running services directly on your Mac:
 This script automatically:
 - Checks your Python virtual environment.
 - Installs frontend and backend dependencies if missing.
-- Launches the Mock Lab on port 5000.
 - Launches the FastAPI backend on port 8000.
 - Launches the Next.js dashboard on port 3000.
 - Cleans up all background processes gracefully when you press `Ctrl+C`.
