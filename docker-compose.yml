@@ -1,0 +1,80 @@
+# ARGUS — one-command judge demo.
+#
+#   docker compose up --build
+#   Dashboard: http://localhost:3000
+#   API docs:  http://localhost:8000/docs
+#
+# The stack defaults to explicit SIMULATION_MODE so it never claims live
+# results. To attempt a live assessment, set ARGUS_SIMULATION_MODE=false and
+# supply ARGUS_BIFROST_API_KEY; the API fails closed without it.
+
+services:
+  mock-target-lab:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/lab/Dockerfile
+    container_name: argus-mock-target-lab
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - argus-lab
+    security_opt:
+      - no-new-privileges:true
+
+  argus-api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    container_name: argus-api
+    restart: unless-stopped
+    environment:
+      ARGUS_ENV: demo
+      ARGUS_LOG_LEVEL: INFO
+      ARGUS_SIMULATION_MODE: ${ARGUS_SIMULATION_MODE:-true}
+      ARGUS_ARTIFACTS_DIR: /app/artifacts
+      ARGUS_DB_PATH: /app/data/argus.db
+      ARGUS_CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000"]'
+      ARGUS_BIFROST_API_KEY: ${ARGUS_BIFROST_API_KEY:-}
+      ARGUS_BIFROST_BASE_URL: ${ARGUS_BIFROST_BASE_URL:-https://bifrost.maxim.ai/v1}
+      ARGUS_TAVILY_API_KEY: ${ARGUS_TAVILY_API_KEY:-}
+    volumes:
+      - argus-data:/app/data
+      - argus-artifacts:/app/artifacts
+    ports:
+      - "8000:8000"
+    depends_on:
+      mock-target-lab:
+        condition: service_healthy
+    networks:
+      - argus-lab
+    security_opt:
+      - no-new-privileges:true
+
+  argus-dashboard:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/web.Dockerfile
+    container_name: argus-dashboard
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_URL: http://argus-api:8000
+      NEXT_PUBLIC_API_URL: http://argus-api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      argus-api:
+        condition: service_healthy
+    networks:
+      - argus-lab
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  argus-lab:
+    driver: bridge
+
+volumes:
+  argus-data:
+  argus-artifacts:
