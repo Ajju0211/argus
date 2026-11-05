@@ -8,6 +8,7 @@ ARGUS is an autonomous security-testing platform for authorized, isolated penetr
 
 ## Documentation & Architecture
 
+- **Plain-English Master Guide:** [`docs/PROJECT_EXPLAINED.md`](docs/PROJECT_EXPLAINED.md) — What ARGUS is, how it works from every perspective, what is currently live, and how network redirection works.
 - **Master Documentation:** [`docs/`](docs/README.md)
   - [`ARGUS_Requirements_and_Build_Specification.md`](docs/ARGUS_Requirements_and_Build_Specification.md) — Master hackathon specification
   - [`ARGUS_MVP_ARCHITECTURE_SPEC.md`](docs/ARGUS_MVP_ARCHITECTURE_SPEC.md) — Master MVP architecture blueprint

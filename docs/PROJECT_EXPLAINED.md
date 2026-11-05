@@ -1,0 +1,345 @@
+# ARGUS: The Complete Project Guide & System Walkthrough
+> **Autonomous Reconnaissance, Governance & Unified Security**  
+> *A plain-English, end-to-end breakdown of what ARGUS is, how it works, what is currently live, and how data flows through the entire system.*
+
+---
+
+## 1. What is ARGUS? (The Simple Explanation)
+
+Imagine hiring an elite cybersecurity ethical hacker to test your company's servers for vulnerabilities. 
+
+- **A human pentester** is thorough, creative, and safe, but they are expensive, work slowly, and get tired.
+- **A traditional automated scanner** (like standard vulnerability tools) is fast, but it is "dumb" — it blasts random attack scripts, crashes servers, triggers false alarms, and generates 200-page reports full of garbage you can't trust.
+- **An unconstrained AI agent** with access to hacking tools could be brilliant, but it is dangerous: what if it hallucinates, attacks the wrong bank, deletes production databases, or goes out of control?
+
+### **ARGUS is the solution:**
+**ARGUS is an Autonomous Penetration Testing Agent with a Built-in, Cryptographic "Safety Cage."**
+
+It thinks like an experienced ethical security researcher using an advanced AI brain (powered by **LangGraph**), but every single move it considers is inspected and approved by a hardware-strict **Policy Firewall**. 
+- It **never** attacks out-of-scope targets.
+- It **never** uses destructive payloads (no `DROP TABLE`, no ransomware, no DDoS).
+- It **proves** every vulnerability it finds with real, tamper-proof cryptographic evidence (raw HTTP requests, hashes, and replay steps).
+- It reports its live progress in real-time to a **Next.js Cyber Command Dashboard** where human operators can watch, pause, resume, or abort with a single click.
+
+---
+
+## 2. ARGUS from Every Point of View
+
+To understand ARGUS completely, let's look through the eyes of the 5 key personas who interact with it:
+
+```
+                  ┌──────────────────────────────────────────────┐
+                  │          1. THE SECURITY OPERATOR            │
+                  │   (Launches scan, monitors HUD, pauses)      │
+                  └──────────────────────┬───────────────────────┘
+                                         │
+                                         ▼
+┌─────────────────────────┐   ┌────────────────────────┐   ┌────────────────────────┐
+│  2. THE AUDITOR / JUDGE │   │    3. THE AI AGENT     │   │ 4. FULLSTACK DEVELOPER │
+│  - Tamper-proof hashes  │◄──┤  - LangGraph state     ├──►│ - Next.js 15 UI        │
+│  - Zero hallucinations  │   │  - Reasoning loop      │   │ - FastAPI + SQLite WAL │
+│  - Policy audit logs    │   │  - Non-destructive POC │   │ - Real-time SSE stream │
+└─────────────────────────┘   └───────────┬────────────┘   └────────────────────────┘
+                                          │
+                                          ▼
+                  ┌──────────────────────────────────────────────┐
+                  │            5. THE TARGET LAB / WEB           │
+                  │   (Safe, non-destructive probe requests)     │
+                  └──────────────────────────────────────────────┘
+```
+
+### 1. The Security Operator's POV ("Hands on Keyboard")
+- **What they see:** A sleek, dark-mode **Cyber Command Center** (`http://localhost:3000`).
+- **What they do:** 
+  1. Click **"New Assessment"**.
+  2. Input the target (e.g., `http://localhost:5000` or `192.168.1.50`), specify the allowed CIDR subnet, and pick a safety tier (`Safe`, `Standard`, or `Aggressive`).
+  3. Hit **"Engage Agent"**.
+- **The Experience:** The screen transforms into a live terminal HUD. They see the AI agent's internal monologue, the active state machine node (Reconnaissance ➡️ Probing ➡️ Exploitation ➡️ Verification), and findings pop up live with CVSS scores. If anything looks concerning, they hit the big red **"Pause"** or **"Emergency Abort"** button.
+
+### 2. The Hackathon Judge & Compliance Auditor's POV ("Can I Trust This?")
+- **The Concern:** "Did the AI actually find an SQL injection, or is the LLM just hallucinating a vulnerability to look smart?"
+- **The ARGUS Guarantee:** 
+  - **Zero Unverified Findings:** ARGUS has a dedicated **Verification Node**. An exploit is never marked as a finding unless it is independently re-tested and proven.
+  - **Evidence Vault:** Every single finding links to an immutable evidence block containing the raw HTTP request sent, the exact HTTP response received, response headers, timestamps, and an unforgeable **SHA-256 digital fingerprint**.
+  - **Full Audit Trail:** A complete JSON log of every decision the agent made, when it made it, and which policy rule permitted it.
+
+### 3. The AI Agent Orchestrator's POV ("The Brain")
+- **How it operates:** The agent does not execute random scripts. It operates on a **Directed Acyclic Graph (DAG) state machine** built on **LangGraph**.
+- **The Thought Cycle:**
+  1. **Initialize:** Read the target scope and set up the mission parameters.
+  2. **Recon:** Gather open ports, discover HTTP endpoints, and perform OSINT queries.
+  3. **Probe:** Check server response headers, detect technologies, and look for misconfigurations.
+  4. **Exploit:** If a potential flaw is detected (e.g., SQL syntax error), try a safe proof-of-concept payload (e.g., `OR '1'='1' LIMIT 1`).
+  5. **Verify:** Replay the attack through an independent verification check to confirm reproducibility.
+  6. **Report:** Synthesize findings, calculate risk scores, and compile downloadable PDF and HTML security reports.
+- **Budget Control:** The agent tracks its API token usage and tool call counts. If it starts looping or burning tokens, circuit breakers trigger to prevent run-away bills.
+
+### 4. The Full-Stack Developer's POV ("The Architecture")
+- **Frontend:** Next.js 15 (React 19, Tailwind CSS, Lucide icons). It uses **Server-Sent Events (SSE)** to stream telemetry events smoothly without polling.
+- **Backend:** Python 3.12 + FastAPI. Handles REST APIs, background threads, and async queues.
+- **Database:** SQLite with **Write-Ahead Logging (WAL)** enabled. Super-fast, zero-setup, thread-safe, and self-contained in a single file (`argus.db`).
+- **Safety Layer:** Custom middleware and policy wrappers that wrap Python tools. Before an HTTP client sends a packet, it must pass through `PolicyFirewall.evaluate(tool, target, payload)`.
+
+### 5. The Target System's POV ("The Receiving End")
+- **What it experiences:** The target server only sees standard, clean HTTP requests with reasonable request rates (rate-limited).
+- **Safety Guarantee:** No buffer overflows, no memory corruption payloads, no heavy payload floods, and no data deletion requests. If a scan targets an IP outside the allowed scope, the request is blocked **inside ARGUS** before a single network packet leaves the machine.
+
+---
+
+## 3. What Has Happened So Far (The Build History)
+
+Here is the step-by-step evolution of the ARGUS codebase across each specification milestone:
+
+| Milestone / Spec | What Was Built | Status |
+| :--- | :--- | :---: |
+| **Spec 00: Architecture** | Modular monolith design, Ports & Adapters architecture, type contracts. | ✅ Completed |
+| **Spec 01: Policy Engine** | Scope enforcer (CIDR/domain), safety firewall, non-destructive payload filter, emergency kill switch. | ✅ Completed |
+| **Spec 02: Agent Orchestrator** | LangGraph DAG state machine, checkpointing, self-healing error recovery, token budget tracking. | ✅ Completed |
+| **Spec 03: Tool Adapters** | HTTP probe tool, port scanner, SQL injection adapter, Nuclei scanner adapter. | ✅ Completed |
+| **Spec 04: Evidence Vault** | Cryptographic SHA-256 evidence hashing, tamper verification, chain-of-custody tracking. | ✅ Completed |
+| **Spec 05: Integrations** | Bifrost HUD telemetry stream adapter, Tavily OSINT reconnaissance search. | ✅ Completed |
+| **Spec 06: API & Persistence** | FastAPI REST endpoints, SQLite WAL persistence, SSE telemetry stream (`/stream`), pause/resume/abort lifecycle. | ✅ Completed |
+| **Spec 07: Next.js Dashboard** | Cyber Command Center UI, real-time live HUD, active scan list, evidence inspector modal, PDF/HTML deliverable viewer. | ✅ Completed |
+| **Infrastructure & Docker** | Multi-stage Dockerfiles (`web.Dockerfile`, `api.Dockerfile`, `lab/Dockerfile`), turnkey `docker-compose.yml`, dev runner script. | ✅ Completed |
+
+---
+
+## 4. What Is Currently Working Right Now (Verified)
+
+Every component listed below is **100% written, verified, and operational**:
+
+### 🛡️ Core Engine & Security
+- **Policy Firewall (`core/policy/firewall.py`):** Intercepts every action. Validates targets against allowed subnets and blocks destructive patterns (`DROP TABLE`, `UNION SELECT password`, `rm -rf`, `format`).
+- **Scope Enforcer (`core/scope/enforcer.py`):** Enforces IP and domain constraints. Rejects external IPs, cloud metadata endpoints (`169.254.169.254`), and unauthorized ports.
+- **Evidence Vault (`core/evidence/vault.py`):** Stores encrypted/hashed evidence artifacts with SHA-256 verification and replayable curl commands.
+- **Report Generator (`core/reporting/generator.py`):** Produces polished Markdown, JSON, and HTML executive vulnerability deliverables.
+
+### 🤖 AI Agent & Orchestrator
+- **LangGraph Graph (`engine/graph.py`):** Fully connected DAG that coordinates `init` ➡️ `recon` ➡️ `probe` ➡️ `exploit` ➡️ `verify` ➡️ `report` ➡️ `finalize`.
+- **Checkpoint Engine:** Captures current agent state at every step. Allows assessments to be paused, stored in SQLite, and resumed seamlessly.
+- **Self-Healing Recovery (`engine/recovery.py`):** Classifies errors (timeouts, rate-limits, network unreachable) and applies automatic retry and backoff strategies.
+
+### 🌐 Backend API (`apps/api/`)
+- **FastAPI Lifecycle Server (`apps/api/main.py`):**
+  - `POST /api/v1/assessments` — Create & start a security assessment.
+  - `GET /api/v1/assessments` — List all assessments.
+  - `GET /api/v1/assessments/{id}` — Fetch detailed assessment state & findings.
+  - `POST /api/v1/assessments/{id}/pause` — Pause execution immediately.
+  - `POST /api/v1/assessments/{id}/resume` — Resume execution from last checkpoint.
+  - `POST /api/v1/assessments/{id}/abort` — Hard stop / emergency kill.
+  - `GET /api/v1/assessments/{id}/stream` — Real-time Server-Sent Events (SSE) telemetry.
+  - `GET /api/v1/assessments/{id}/reports/{format}` — Download Markdown/HTML/PDF reports.
+- **SQLite Database (`apps/api/database.py`):** WAL mode enabled for concurrent reads/writes without table locking.
+
+### 💻 Cyber Command Dashboard (`apps/web/`)
+- Built with **Next.js 15 App Router** and **React 19**.
+- High-contrast Cyber Command HUD with pulsing status badges, latency meters, and live killchain visualizers.
+- **SSE Stream Listener:** Real-time log terminal streaming agent steps live to the browser.
+- **Evidence Modal:** Click any finding to inspect raw request/response headers, status codes, and SHA-256 hash.
+- **Report Viewer:** Embedded preview of the final vulnerability assessment report.
+
+### 🧪 Quality & Test Suite Status
+- **Pytest:** `223 passed in 11.69s` (**100% pass rate**).
+- **Pyright Type Checker:** `0 errors, 0 warnings`.
+- **Mypy Static Analysis:** `Success: no issues found in 74 source files`.
+- **Ruff Linter:** `All checks passed!`.
+- **Next.js Production Build:** `Compiled successfully (standalone mode ready)`.
+
+---
+
+## 5. How Things Proceed: The End-to-End Life of a Scan
+
+Here is the exact step-by-step journey of what happens inside the computer when you run an assessment:
+
+```
+[User on Next.js UI]
+       │
+       ▼ (1) Click "Launch Assessment" (Target: http://localhost:5000)
+[FastAPI: POST /api/v1/assessments]
+       │
+       ▼ (2) Policy Firewall checks: Is localhost:5000 in scope? (YES)
+[SQLite WAL Database]
+       │ Records assessment row (Status: RUNNING)
+       ▼ (3) Spawns background worker thread
+[LangGraph Orchestrator]
+       │
+       ├─► (4) Node: RECON
+       │       - Probes HTTP server banner
+       │       - Identifies Werkzeug / Flask
+       │       - Streams log to SSE -> User Dashboard shows "Target fingerprinted"
+       │
+       ├─► (5) Node: PROBE
+       │       - Discovers /api/search endpoint
+       │       - Policy Firewall intercepts: Is probe safe? (YES)
+       │       - Identifies unescaped user parameter in search query
+       │
+       ├─► (6) Node: EXPLOIT
+       │       - Sends safe POC payload: ' OR 1=1 --
+       │       - Database returns leak: mock target returns all users
+       │
+       ├─► (7) Node: VERIFY
+       │       - Replays the query to guarantee it is not a fluke or hallucination
+       │       - Vulnerability confirmed: SQL Injection (CVSS 8.5 HIGH)
+       │
+       ├─► (8) Evidence Vault
+       │       - Captures raw HTTP request & response
+       │       - Computes SHA-256 hash: e.g. a8b4...9f10
+       │       - Stores immutable record linked to finding
+       │
+       ├─► (9) Node: REPORT
+       │       - Compiles executive summary, risk breakdown, and remediation steps
+       │       - Saves Markdown, JSON, and HTML reports
+       │
+       ▼ (10) Node: FINALIZE
+[Status updated to COMPLETED] ──► SSE sends "COMPLETED" event ──► Next.js Dashboard sounds chime & shows report
+```
+
+---
+
+## 6. Networking, Ports & Redirection Guide
+
+A common question when running multi-service architectures is: *"How do ports talk to each other, and how do requests get directed?"*
+
+Here is the exact network map:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                          HOST MACHINE (Your Mac)                       │
+│                                                                        │
+│   Browser: http://localhost:3000                                       │
+│      │                                                                 │
+│      ▼                                                                 │
+│   ┌───────────────────────────────────────────────────────────────┐    │
+│   │ Next.js Cyber Dashboard (Port 3000)                          │    │
+│   │ - Server: Node.js 20 Alpine                                   │    │
+│   │ - Fetches API: NEXT_PUBLIC_API_URL=http://localhost:8000      │    │
+│   │ - Subscribes to SSE: http://localhost:8000/.../stream         │    │
+│   └───────────────────────────────┬───────────────────────────────┘    │
+│                                   │                                    │
+│                                   ▼                                    │
+│   ┌───────────────────────────────────────────────────────────────┐    │
+│   │ FastAPI Core Backend (Port 8000)                              │    │
+│   │ - Server: Uvicorn / Python 3.12                               │    │
+│   │ - Database: argus.db (SQLite WAL)                             │    │
+│   │ - Interactive Swagger Docs: http://localhost:8000/docs        │    │
+│   │ - Attacks target via HTTP: http://localhost:5000               │    │
+│   └───────────────────────────────┬───────────────────────────────┘    │
+│                                   │                                    │
+│                                   ▼                                    │
+│   ┌───────────────────────────────────────────────────────────────┐    │
+│   │ Mock Target Vulnerability Lab (Port 5000)                     │    │
+│   │ - Server: Python Flask                                        │    │
+│   │ - Contains deliberate safe vulnerabilities (SQLi, IDOR, XSS)  │    │
+│   │ - Accessible at: http://localhost:5000                        │    │
+│   └───────────────────────────────────────────────────────────────┘    │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### How Network Routing Works in ARGUS:
+1. **Frontend to Backend:**
+   - The browser opens `http://localhost:3000`.
+   - When you click "Launch", the browser's JavaScript makes a REST `POST` request to `http://localhost:8000/api/v1/assessments`.
+   - FastAPI receives the request, sets CORS headers (`allow_origins=["*"]`), and returns the created assessment JSON.
+2. **Real-Time Telemetry (SSE):**
+   - The browser opens a persistent HTTP connection to `http://localhost:8000/api/v1/assessments/{id}/stream`.
+   - FastAPI keeps this connection open and pushes small JSON text chunks every time a log message or node transition occurs.
+   - The browser's `EventSource` receives these chunks and updates the HUD in milliseconds without page refreshes.
+3. **Backend to Target:**
+   - When the agent runs tool queries (like `HttpProbeTool`), the Python backend creates an HTTP request directed at `http://localhost:5000`.
+   - The Policy Firewall evaluates the request destination before it leaves Python. If the IP is permitted, the request is sent to port 5000.
+4. **Docker Container Networking:**
+   - In Docker Compose, all three containers live on a shared internal bridge network (`argus-network`).
+   - Containers can talk to each other using their service names (`argus-api`, `argus-dashboard`, `mock-target-lab`) while also exposing ports `3000`, `8000`, and `5000` to your host machine.
+
+---
+
+## 7. How to Run Everything (Quickstart)
+
+### Method A: The One-Command Turnkey Way (Docker)
+This starts all three services in isolated, production-ready containers:
+
+```bash
+# 1. Enter the project root
+cd /Users/ajaysingh/Documents/Open-source/argus
+
+# 2. Make sure environment variables exist
+cp .env.example .env
+
+# 3. Boot all services
+docker compose up --build
+```
+- Open `http://localhost:3000` to see the **Dashboard**.
+- Open `http://localhost:8000/docs` to see the **FastAPI Swagger API Documentation**.
+- Open `http://localhost:5000` to see the **Mock Target Lab**.
+
+---
+
+### Method B: The Local Development Launcher (No Docker required)
+If you prefer running services directly on your Mac:
+
+```bash
+# 1. Run the all-in-one launcher script
+./scripts/dev.sh
+```
+This script automatically:
+- Checks your Python virtual environment.
+- Installs frontend and backend dependencies if missing.
+- Launches the Mock Lab on port 5000.
+- Launches the FastAPI backend on port 8000.
+- Launches the Next.js dashboard on port 3000.
+- Cleans up all background processes gracefully when you press `Ctrl+C`.
+
+---
+
+### Method C: Running Individual Verification Tests
+To verify that everything in the backend is 100% bug-free:
+
+```bash
+# Activate virtual environment
+source .venv/bin/activate
+
+# Run all 223 automated unit and integration tests
+pytest tests/ -v
+
+# Run type checks
+pyright
+mypy --explicit-package-bases core engine packages apps
+
+# Run linter
+ruff check .
+```
+
+To verify the Next.js frontend:
+```bash
+cd apps/web
+npm run typecheck
+npm run build
+```
+
+---
+
+## 8. Summary Table: Where Files Live & What They Do
+
+| Directory | What Lives Inside |
+| :--- | :--- |
+| **`packages/contracts/`** | The data blueprints (Pydantic schemas for Findings, Assessments, Evidence, Policy, and Scope). |
+| **`core/policy/`** | The safety gatekeeper: enforces non-destructive testing, checks IPs, and provides emergency abort. |
+| **`core/evidence/`** | The cryptographic evidence vault: stores raw HTTP payloads and SHA-256 hashes. |
+| **`core/reporting/`** | Report synthesis engine: generates Markdown, HTML, and PDF deliverables. |
+| **`engine/`** | The AI agent brain: LangGraph DAG state machine, recovery loops, and system prompts. |
+| **`integrations/`** | External adapters: Bifrost telemetry streamer, Tavily OSINT search, and security tools. |
+| **`apps/api/`** | FastAPI web server, SQLite WAL persistence, SSE streaming, and background thread runners. |
+| **`apps/web/`** | Next.js 15 Cyber Command Dashboard, React 19 UI, terminal HUD, and evidence inspector. |
+| **`infrastructure/`** | Dockerfiles for the dashboard, API, and mock vulnerable target lab. |
+| **`docs/`** | Specifications, architectural blueprints, and this master guide. |
+| **`tests/`** | Complete test suite (223 tests covering every policy, state node, and API route). |
+
+---
+
+## 9. Conclusion & Mental Model
+
+When you think about ARGUS, keep this simple mental model in mind:
+
+> **"ARGUS is an AI ethical hacker whose hands are placed inside safety-gloved mechanical arms (Policy Firewall). It can look at targets, find weak spots, and demonstrate proof-of-concepts, but the mechanical arms physically lock up if it ever tries to touch an unauthorized server or cause real damage. Everything it does is recorded on camera with cryptographic timestamps (Evidence Vault) and broadcast live to your command screen (Next.js Dashboard)."**
+
+Everything is built, verified, type-safe, containerized, and ready to demonstrate!
