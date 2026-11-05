@@ -131,6 +131,44 @@ class TestEvidenceVault:
                 cmd="nmap",
             )
 
+    def test_evidence_hash_chain_integrity(self, tmp_path: Path) -> None:
+        """Verifies multi-artifact tamper-evident hash chain (Merkle ledger)."""
+        vault = EvidenceVault(base_dir=tmp_path)
+        asm_id = "asm-chain-01"
+
+        art1 = vault.store_artifact(asm_id, "nmap", "port 80 open", "nmap 192.168.1.1")
+        art2 = vault.store_artifact(asm_id, "http_probe", "HTTP 200 OK", "curl http://192.168.1.1")
+        art3 = vault.store_artifact(asm_id, "nuclei", "cve-2021-41773 match", "nuclei -t cve.yaml")
+
+        assert art1.prev_hash == "0" * 64
+        assert art2.prev_hash != "0" * 64
+        assert art3.prev_hash != art2.prev_hash
+
+        is_valid, msg, count = vault.verify_chain_integrity(asm_id)
+        assert is_valid is True
+        assert count == 3
+        assert "verified" in msg.lower()
+
+    def test_evidence_hash_chain_detects_splicing_or_deletion(self, tmp_path: Path) -> None:
+        """Tampering with metadata log (removing/splicing entries) breaks chain continuity."""
+        vault = EvidenceVault(base_dir=tmp_path)
+        asm_id = "asm-chain-tamper"
+
+        vault.store_artifact(asm_id, "step1", "out1", "cmd1")
+        vault.store_artifact(asm_id, "step2", "out2", "cmd2")
+        vault.store_artifact(asm_id, "step3", "out3", "cmd3")
+
+        metadata_file = tmp_path / asm_id / "metadata.jsonl"
+        lines = metadata_file.read_text(encoding="utf-8").splitlines()
+
+        # Delete step 2 from the log
+        tampered_lines = [lines[0], lines[2]]
+        metadata_file.write_text("\n".join(tampered_lines) + "\n", encoding="utf-8")
+
+        is_valid, msg, _count = vault.verify_chain_integrity(asm_id)
+        assert is_valid is False
+        assert "chain continuity broken" in msg.lower()
+
 
 class TestFindingContractsAndStateMachine:
     """Verifies finding schema, confidence transitions, and zero-hallucination invariant."""

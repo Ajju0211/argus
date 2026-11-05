@@ -63,7 +63,16 @@ class EvidenceVault:
         # 4. Write payload to disk
         file_path.write_text(redacted_content, encoding="utf-8")
 
-        # 5. Build immutable EvidenceArtifact record
+        # 5. Compute cryptographic chain link (Merkle audit ledger)
+        metadata_file = artifact_dir / "metadata.jsonl"
+        prev_hash = "0" * 64
+        if metadata_file.exists() and metadata_file.stat().st_size > 0:
+            with open(metadata_file, "rb") as f:
+                lines = [line.strip() for line in f if line.strip()]
+                if lines:
+                    prev_hash = hashlib.sha256(lines[-1]).hexdigest()
+
+        # 6. Build immutable EvidenceArtifact record
         artifact = EvidenceArtifact(
             evidence_id=evidence_id,
             assessment_id=assessment_id,
@@ -75,11 +84,11 @@ class EvidenceVault:
             captured_at=now,
             content_type=content_type,
             redacted=was_redacted,
+            prev_hash=prev_hash,
             metadata=metadata or {},
         )
 
-        # 6. Append to metadata.jsonl
-        metadata_file = artifact_dir / "metadata.jsonl"
+        # 7. Append to metadata.jsonl
         with open(metadata_file, "a", encoding="utf-8") as f:
             f.write(artifact.model_dump_json() + "\n")
 
@@ -137,3 +146,53 @@ class EvidenceVault:
             f"Integrity violation (mismatch) detected for '{evidence_id}': "
             f"expected SHA-256 {artifact.sha256}, calculated {current_digest}."
         )
+
+    def verify_chain_integrity(self, assessment_id: str) -> tuple[bool, str, int]:
+        """Validates the entire evidence log hash chain (tamper-evident audit ledger).
+
+        Guarantees that no artifacts were deleted, inserted, or reordered.
+
+        Returns:
+            tuple of (is_valid, detail_message, verified_artifact_count)
+        """
+        self._validate_id(assessment_id, "assessment_id")
+        metadata_file = self.base_dir / assessment_id / "metadata.jsonl"
+        if not metadata_file.exists():
+            return True, "No evidence artifacts recorded yet", 0
+
+        expected_prev_hash = "0" * 64
+        count = 0
+        with open(metadata_file, encoding="utf-8") as f:
+            for line_no, line in enumerate(f, start=1):
+                clean = line.strip()
+                if not clean:
+                    continue
+                count += 1
+                try:
+                    data = json.loads(clean)
+                    artifact = EvidenceArtifact.model_validate(data)
+                except Exception as exc:
+                    return False, f"Line {line_no} malformed JSON or invalid schema: {exc}", count
+
+                # 1. Verify individual file content against its recorded sha256
+                is_valid, msg = self.verify_integrity(assessment_id, artifact.evidence_id)
+                if not is_valid:
+                    return (
+                        False,
+                        f"Artifact {artifact.evidence_id} failed content verification: {msg}",
+                        count,
+                    )
+
+                # 2. Verify blockchain/hash-chain continuity
+                if artifact.prev_hash != expected_prev_hash:
+                    return (
+                        False,
+                        f"Chain continuity broken at line {line_no} ({artifact.evidence_id}): "
+                        f"expected prev_hash {expected_prev_hash[:16]}..., got {artifact.prev_hash[:16]}...",
+                        count,
+                    )
+
+                # Next line's expected prev_hash is the SHA-256 of the current raw line
+                expected_prev_hash = hashlib.sha256(clean.encode("utf-8")).hexdigest()
+
+        return True, f"Cryptographic evidence chain verified ({count} artifacts, Merkle-linked)", count

@@ -46,6 +46,10 @@ class EvidenceArtifact(BaseModel):
     captured_at: datetime = Field(..., description="UTC timestamp when artifact was written")
     content_type: str = Field(default="text/plain", description="MIME content type")
     redacted: bool = Field(default=False, description="Whether sensitive tokens were scrubbed")
+    prev_hash: str = Field(
+        default="0" * 64,
+        description="Cryptographic SHA-256 digest of preceding artifact entry for tamper-evident chain of custody",
+    )
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Arbitrary execution context"
     )

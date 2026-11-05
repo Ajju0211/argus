@@ -64,10 +64,12 @@ services:
       ARGUS_DB_PATH: /app/data/argus.db
       ARGUS_CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000"]'
       ARGUS_BIFROST_API_KEY: ${ARGUS_BIFROST_API_KEY:-sk-bf-local}
-      ARGUS_BIFROST_BASE_URL: ${ARGUS_BIFROST_BASE_URL:-http://bifrost:8080/v1}
+      ARGUS_BIFROST_BASE_URL: ${ARGUS_DOCKER_BIFROST_BASE_URL:-http://bifrost:8080/v1}
       ARGUS_BIFROST_PRIMARY_MODEL: ${ARGUS_BIFROST_PRIMARY_MODEL:-claude-3-5-sonnet-20241022}
       ARGUS_BIFROST_FALLBACK_MODEL: ${ARGUS_BIFROST_FALLBACK_MODEL:-gpt-4o}
       ARGUS_TAVILY_API_KEY: ${ARGUS_TAVILY_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - argus-data:/app/data
       - argus-artifacts:/app/artifacts
@@ -92,7 +94,7 @@ services:
     environment:
       NODE_ENV: production
       API_URL: http://argus-api:8000
-      NEXT_PUBLIC_API_URL: http://argus-api:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     ports:
       - "3000:3000"
     depends_on:

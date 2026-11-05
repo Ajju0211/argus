@@ -126,6 +126,17 @@ def extract_target_spec(target: dict[str, Any] | str) -> dict[str, Any]:
         elif scheme == "https":
             port = 443
 
+    # Inter-container Docker networking resolution:
+    # If running inside a container network and targeting localhost lab ports,
+    # auto-resolve to the internal container DNS name 'mock-target-lab'.
+    if host in ("localhost", "127.0.0.1") and port in (5000, 8080):
+        try:
+            socket.gethostbyname("mock-target-lab")
+            host = "mock-target-lab"
+            port = 8080
+        except OSError:
+            pass
+
     return {"host": host, "port": port, "scheme": scheme, "path": path}
 
 

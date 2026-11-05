@@ -382,6 +382,7 @@ def cancel_assessment(assessment_id: str, request: Request) -> StatusResponse:
 
 
 @router.get("/{assessment_id}/events")
+@router.get("/{assessment_id}/stream")
 async def stream_assessment_events(assessment_id: str, request: Request) -> StreamingResponse:
     """Server-Sent Events stream of node transitions, findings, and telemetry."""
     database = request.app.state.db

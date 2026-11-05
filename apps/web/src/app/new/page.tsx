@@ -53,7 +53,7 @@ export default function NewAssessmentPage() {
   const [name, setName] = useState(PRESET_MOCK_LAB.name);
   const [target, setTarget] = useState(PRESET_MOCK_LAB.target);
   const [scopeYaml, setScopeYaml] = useState(PRESET_MOCK_LAB.scopeYaml);
-  const [objective, setObjective] = useState("discover_services");
+  const [objective, setObjective] = useState("find_cve");
   const [maxIterations, setMaxIterations] = useState(8);
   const [simulation, setSimulation] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -244,9 +244,10 @@ export default function NewAssessmentPage() {
                 onChange={(e) => setObjective(e.target.value)}
                 className="w-full h-10 rounded-xl border border-cyber-border bg-cyber-bg px-3.5 text-xs font-mono text-white focus:border-indigo-500 focus:outline-none"
               >
-                <option value="discover_services">Discover open services and attack surface</option>
+                <option value="find_cve">Autonomous Vulnerability Assessment & Proof Verification</option>
+                <option value="multi_step">Multi-Step Attack Path Chain (Recon ➡️ Probe ➡️ Exploit ➡️ Verify)</option>
                 <option value="severity_threshold">Verify CVEs matching HIGH/CRITICAL severity</option>
-                <option value="find_cve">Confirm a specific reproducible vulnerability</option>
+                <option value="discover_services">Reconnaissance & Attack Surface Discovery Only</option>
               </select>
             </div>
 
