@@ -13,6 +13,10 @@ import {
   Zap,
 } from "lucide-react";
 import { createAssessment } from "@/lib/api";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 const PRESET_MOCK_LAB = {
   name: "Judge Lab Demo Assessment",
@@ -65,7 +69,6 @@ export default function NewAssessmentPage() {
       if (!scopeYaml.trim()) {
         return { valid: false, message: "Scope YAML cannot be empty" };
       }
-      // Simple parser check
       const lines = scopeYaml.split("\n");
       const hasTargets = lines.some((l) => l.trim().startsWith("allowed_hosts:"));
       const hasPorts = lines.some((l) => l.trim().startsWith("allowed_ports:"));
@@ -115,192 +118,179 @@ export default function NewAssessmentPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Top Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs font-mono text-cyber-muted">
-        <Link href="/" className="hover:text-white flex items-center gap-1 transition-colors">
+      <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+        <Link href="/" className="hover:text-foreground flex items-center gap-1 transition-colors">
           <ArrowLeft className="h-3 w-3" />
           Command Center
         </Link>
         <span>/</span>
-        <span className="text-white">New Assessment</span>
+        <span className="text-foreground">New Assessment</span>
       </div>
 
-      <div className="glass-panel-elevated rounded-3xl p-6 sm:p-8 border border-cyber-border space-y-8">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-wide">
-            Launch Authorized Assessment
-          </h1>
-          <p className="text-xs sm:text-sm text-cyber-muted mt-1">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">Launch Authorized Assessment</CardTitle>
+          <CardDescription>
             Configure target boundaries and policy-approved scope. All execution passes through the deterministic safety firewall.
-          </p>
-        </div>
+          </CardDescription>
+        </CardHeader>
 
-        {/* Demo Quick Presets */}
-        <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-4">
-          <div className="flex items-center gap-2 text-xs font-mono font-bold text-indigo-300 mb-2">
-            <Zap className="h-4 w-4 text-indigo-400" />
-            Hackathon Judge Quick Presets
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setName(PRESET_MOCK_LAB.name);
-                setTarget(PRESET_MOCK_LAB.target);
-                setScopeYaml(PRESET_MOCK_LAB.scopeYaml);
-              }}
-              className="rounded-lg border border-indigo-500/40 bg-indigo-500/20 px-3 py-1.5 text-xs font-mono text-white hover:bg-indigo-500/30 transition-colors"
-            >
-              ⚡ Mock Lab Fixture (8080)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setName(PRESET_OWASP_JUICE.name);
-                setTarget(PRESET_OWASP_JUICE.target);
-                setScopeYaml(PRESET_OWASP_JUICE.scopeYaml);
-              }}
-              className="rounded-lg border border-cyber-border bg-cyber-card px-3 py-1.5 text-xs font-mono text-cyber-muted hover:text-white transition-colors"
-            >
-              🌐 Local Subnet Demo (192.168.100.5)
-            </button>
-          </div>
-        </div>
-
-        {submitError && (
-          <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-xs font-mono text-rose-300 flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-rose-400 shrink-0" />
-            <span>{submitError}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleLaunch} className="space-y-6">
-          {/* Target Info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-mono uppercase tracking-wider text-cyber-muted mb-2">
-                Assessment Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="w-full h-10 rounded-xl border border-cyber-border bg-cyber-bg px-3.5 text-xs font-mono text-white placeholder-cyber-muted focus:border-indigo-500 focus:outline-none"
-              />
+        <CardContent className="space-y-6">
+          {/* Quick Presets */}
+          <div className="rounded-lg border border-border bg-muted/40 p-4">
+            <div className="flex items-center gap-2 text-xs font-mono font-bold text-foreground mb-2">
+              <Zap className="h-4 w-4 text-primary" />
+              Demo Quick Presets
             </div>
-
-            <div>
-              <label className="block text-xs font-mono uppercase tracking-wider text-cyber-muted mb-2">
-                Target URL / IP Address
-              </label>
-              <input
-                type="text"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                required
-                className="w-full h-10 rounded-xl border border-cyber-border bg-cyber-bg px-3.5 text-xs font-mono text-white placeholder-cyber-muted focus:border-indigo-500 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Scope YAML Editor & Live Validation */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-mono uppercase tracking-wider text-cyber-muted">
-                Authorized Scope Document (YAML)
-              </label>
-              <span
-                className={`inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded border ${
-                  scopeValidation.valid
-                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
-                    : "border-rose-500/40 bg-rose-500/10 text-rose-400"
-                }`}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setName(PRESET_MOCK_LAB.name);
+                  setTarget(PRESET_MOCK_LAB.target);
+                  setScopeYaml(PRESET_MOCK_LAB.scopeYaml);
+                }}
               >
-                {scopeValidation.valid ? (
-                  <CheckCircle2 className="h-3 w-3" />
-                ) : (
-                  <AlertCircle className="h-3 w-3" />
-                )}
-                {scopeValidation.message}
-              </span>
+                Mock Lab Fixture (8080)
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setName(PRESET_OWASP_JUICE.name);
+                  setTarget(PRESET_OWASP_JUICE.target);
+                  setScopeYaml(PRESET_OWASP_JUICE.scopeYaml);
+                }}
+              >
+                Local Subnet Demo (192.168.100.5)
+              </Button>
             </div>
-            <textarea
-              value={scopeYaml}
-              onChange={(e) => setScopeYaml(e.target.value)}
-              rows={10}
-              required
-              className="w-full rounded-2xl border border-cyber-border bg-cyber-bg p-4 font-mono text-xs text-cyber-text leading-relaxed focus:border-indigo-500 focus:outline-none resize-y"
-            />
           </div>
 
-          {/* Objective & Limits */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-mono uppercase tracking-wider text-cyber-muted mb-2">
-                Assessment Objective
-              </label>
-              <select
-                value={objective}
-                onChange={(e) => setObjective(e.target.value)}
-                className="w-full h-10 rounded-xl border border-cyber-border bg-cyber-bg px-3.5 text-xs font-mono text-white focus:border-indigo-500 focus:outline-none"
-              >
-                <option value="find_cve">Autonomous Vulnerability Assessment & Proof Verification</option>
-                <option value="multi_step">Multi-Step Attack Path Chain (Recon ➡️ Probe ➡️ Exploit ➡️ Verify)</option>
-                <option value="severity_threshold">Verify CVEs matching HIGH/CRITICAL severity</option>
-                <option value="discover_services">Reconnaissance & Attack Surface Discovery Only</option>
-              </select>
+          {submitError && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs font-mono text-destructive flex items-center gap-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{submitError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLaunch} className="space-y-6">
+            {/* Target Info */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                  Assessment Name
+                </label>
+                <Input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                  Target URL / IP Address
+                </label>
+                <Input
+                  type="text"
+                  value={target}
+                  onChange={(e) => setTarget(e.target.value)}
+                  required
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-mono uppercase tracking-wider text-cyber-muted mb-2">
-                Max Iteration Budget
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={50}
-                value={maxIterations}
-                onChange={(e) => setMaxIterations(Number(e.target.value))}
-                className="w-full h-10 rounded-xl border border-cyber-border bg-cyber-bg px-3.5 text-xs font-mono text-white focus:border-indigo-500 focus:outline-none"
+            {/* Scope YAML Editor & Live Validation */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                  Authorized Scope Document (YAML)
+                </label>
+                <Badge variant={scopeValidation.valid ? "success" : "destructive"}>
+                  {scopeValidation.valid ? (
+                    <CheckCircle2 className="h-3 w-3" />
+                  ) : (
+                    <AlertCircle className="h-3 w-3" />
+                  )}
+                  <span>{scopeValidation.message}</span>
+                </Badge>
+              </div>
+
+              <textarea
+                rows={9}
+                value={scopeYaml}
+                onChange={(e) => setScopeYaml(e.target.value)}
+                required
+                className="w-full rounded-md border border-input bg-muted/20 p-3 font-mono text-xs text-foreground focus:border-primary focus:outline-none"
               />
             </div>
-          </div>
 
-          {/* Safety Sandbox Switch */}
-          <div className="flex items-center gap-3 p-4 rounded-xl border border-cyber-border bg-cyber-card/50">
-            <input
-              type="checkbox"
-              id="sim-check"
-              checked={simulation}
-              onChange={(e) => setSimulation(e.target.checked)}
-              className="h-4 w-4 rounded border-cyber-border bg-cyber-bg text-indigo-600 focus:ring-0"
-            />
-            <label htmlFor="sim-check" className="text-xs text-cyber-muted font-mono cursor-pointer">
-              <span className="text-white font-semibold">Simulation Mode:</span> Clearly labelled offline demonstration.
-              Does not invoke destructive external network tools or consume live paid credits.
-            </label>
-          </div>
+            {/* Execution Strategy */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                  Objective Strategy
+                </label>
+                <select
+                  value={objective}
+                  onChange={(e) => setObjective(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs font-mono text-foreground focus:border-primary focus:outline-none"
+                >
+                  <option value="find_cve">Find & Verify Vulnerabilities</option>
+                  <option value="discover_services">Reconnaissance & Ports Only</option>
+                  <option value="severity_threshold">Critical/High Severity Only</option>
+                </select>
+              </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-cyber-border">
-            <Link
-              href="/"
-              className="rounded-xl border border-cyber-border bg-cyber-card px-5 py-2.5 text-xs font-mono text-cyber-muted hover:text-white transition-colors"
-            >
-              Cancel
-            </Link>
-            <button
-              type="submit"
-              disabled={isSubmitting || !scopeValidation.valid}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 px-6 py-2.5 text-xs font-mono font-bold text-white shadow-lg shadow-indigo-600/30 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
-            >
-              <Rocket className="h-4 w-4" />
-              {isSubmitting ? "Launching Agent..." : "Launch Assessment"}
-            </button>
-          </div>
-        </form>
-      </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                  Max ReAct Iterations
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={maxIterations}
+                  onChange={(e) => setMaxIterations(Number(e.target.value))}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                  Engine Mode
+                </label>
+                <select
+                  value={simulation ? "true" : "false"}
+                  onChange={(e) => setSimulation(e.target.value === "true")}
+                  className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs font-mono text-foreground focus:border-primary focus:outline-none"
+                >
+                  <option value="true">Simulation Mode (Fixture Targets)</option>
+                  <option value="false">Live Agent Mode (Bifrost Gateway)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Launch Action */}
+            <div className="flex items-center justify-end pt-4 border-t border-border">
+              <Button
+                type="submit"
+                disabled={isSubmitting || !scopeValidation.valid}
+                size="lg"
+                className="gap-2"
+              >
+                <Rocket className="h-4 w-4" />
+                <span>{isSubmitting ? "Initializing Pipeline..." : "Engage Agent"}</span>
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
-

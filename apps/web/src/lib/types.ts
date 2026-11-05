@@ -70,8 +70,11 @@ export interface AssessmentDetail {
     id?: string;
     evidence_id?: string;
     tool_name?: string;
+    action_name?: string;
     sha256?: string;
+    sha256_hash?: string;
     file_path?: string;
+    file_size_bytes?: number;
   }>;
   blocked_actions: Array<{
     action_id?: string;
@@ -96,6 +99,7 @@ export interface AssessmentEvent {
   id: number;
   eventType: string;
   node?: string;
+  message?: string;
   data: Record<string, unknown>;
   timestamp: string;
 }

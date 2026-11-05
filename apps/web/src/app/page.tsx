@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PlusCircle, ShieldAlert, RefreshCw } from "lucide-react";
+import { PlusCircle, ShieldAlert, RefreshCw, Terminal, Activity } from "lucide-react";
 import { KpiCardGrid } from "@/components/dashboard/KpiCardGrid";
 import { AssessmentsTable } from "@/components/dashboard/AssessmentsTable";
 import { AssessmentDetail } from "@/lib/types";
 import { listAssessments } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default function DashboardPage() {
   const [assessments, setAssessments] = useState<AssessmentDetail[]>([]);
@@ -37,59 +40,71 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-8">
-      {/* Hero Welcome Banner */}
-      <div className="relative overflow-hidden rounded-3xl glass-panel-elevated p-6 sm:p-8 border border-cyber-border">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-mono font-semibold text-indigo-300">
-              <span className="flex h-1.5 w-1.5 rounded-full bg-indigo-400"></span>
-              Autonomous Agent Orchestrator Active
+    <div className="space-y-6">
+      {/* Executive Command Header */}
+      <Card className="border-border bg-card/80">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="success" className="font-mono text-[11px] gap-1.5">
+                  <Activity className="h-3 w-3 animate-pulse" />
+                  Autonomous ReAct Agent Orchestrator Active
+                </Badge>
+                <Badge variant="outline" className="font-mono text-[11px]">
+                  Bifrost OSS Gateway
+                </Badge>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-mono font-bold tracking-tight text-foreground">
+                Security Operations Command Center
+              </h1>
+              <p className="max-w-2xl text-xs font-mono text-muted-foreground">
+                Zero-hallucination penetration testing console. Every vulnerability is backed by
+                verifiable HTTP proof and recorded in a cryptographic Merkle hash chain.
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-              Security Operations Center
-            </h1>
-            <p className="max-w-2xl text-xs sm:text-sm text-cyber-muted">
-              Live proof-carrying assessment console. Every finding is verified by cryptographic evidence
-              before promotion to prevent LLM hallucination.
-            </p>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => loadAssessments(false)}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 rounded-xl border border-cyber-border bg-cyber-panel/80 px-4 py-2.5 text-xs font-mono text-cyber-muted hover:text-white hover:bg-cyber-card transition-all disabled:opacity-50"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-              Refresh
-            </button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadAssessments(false)}
+                disabled={isRefreshing}
+                className="gap-1.5"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+                <span>Refresh</span>
+              </Button>
 
-            <Link
-              href="/new"
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 px-5 py-2.5 text-xs font-mono font-bold text-white shadow-lg shadow-indigo-500/25 hover:brightness-110 active:scale-95 transition-all"
-            >
-              <PlusCircle className="h-4 w-4" />
-              Launch Assessment
-            </Link>
+              <Link href="/new">
+                <Button size="sm" className="gap-1.5">
+                  <PlusCircle className="h-4 w-4" />
+                  <span>Launch Assessment</span>
+                </Button>
+              </Link>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Error Alert */}
       {error && (
-        <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-xs font-mono text-rose-300 flex items-center gap-3">
-          <ShieldAlert className="h-5 w-5 text-rose-400 shrink-0" />
-          <span>{error} Please ensure the backend is running at <code className="text-white">http://localhost:8000</code>.</span>
-        </div>
+        <Card className="border-destructive/40 bg-destructive/10 text-destructive">
+          <CardContent className="p-4 flex items-center gap-3 text-xs font-mono">
+            <ShieldAlert className="h-5 w-5 shrink-0" />
+            <span>
+              {error} Please ensure the backend is running at{" "}
+              <code className="font-bold underline">http://localhost:8000</code>.
+            </span>
+          </CardContent>
+        </Card>
       )}
 
-      {/* KPI Cards */}
+      {/* Domain KPI Cards */}
       <KpiCardGrid assessments={assessments} />
 
-      {/* Historical Assessments Table */}
+      {/* Historical Assessments Domain View */}
       <AssessmentsTable assessments={assessments} />
     </div>
   );
 }
-

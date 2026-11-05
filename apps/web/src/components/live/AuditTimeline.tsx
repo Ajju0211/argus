@@ -15,6 +15,8 @@ import {
   AlertOctagon,
 } from "lucide-react";
 import { AssessmentEvent } from "@/lib/types";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface AuditTimelineProps {
   events: AssessmentEvent[];
@@ -32,31 +34,20 @@ export function AuditTimeline({ events }: AuditTimelineProps) {
   const getEventIcon = (type: string) => {
     switch (type) {
       case "assessment_created":
-        return <ShieldCheck className="h-3.5 w-3.5 text-indigo-400" />;
       case "scope_validated":
-        return <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />;
-      case "recon_completed":
-        return <Search className="h-3.5 w-3.5 text-cyan-400" />;
       case "action_approved":
-        return <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />;
-      case "action_blocked":
-        return <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />;
-      case "tool_completed":
-        return <Terminal className="h-3.5 w-3.5 text-cyan-400" />;
-      case "finding_verified":
-        return <Bug className="h-3.5 w-3.5 text-rose-400" />;
-      case "assessment_paused":
-        return <Pause className="h-3.5 w-3.5 text-amber-400" />;
       case "assessment_resumed":
-        return <Play className="h-3.5 w-3.5 text-emerald-400" />;
-      case "report_generated":
-        return <FileText className="h-3.5 w-3.5 text-indigo-400" />;
       case "assessment_completed":
-        return <CheckCheck className="h-3.5 w-3.5 text-emerald-400" />;
+        return <CheckCircle className="h-3.5 w-3.5 text-primary" />;
+      case "action_blocked":
+      case "finding_verified":
       case "assessment_failed":
-        return <AlertOctagon className="h-3.5 w-3.5 text-rose-400" />;
+        return <AlertOctagon className="h-3.5 w-3.5 text-destructive" />;
+      case "recon_completed":
+      case "tool_completed":
+      case "report_generated":
       default:
-        return <Terminal className="h-3.5 w-3.5 text-cyber-muted" />;
+        return <Terminal className="h-3.5 w-3.5 text-muted-foreground" />;
     }
   };
 
@@ -64,7 +55,7 @@ export function AuditTimeline({ events }: AuditTimelineProps) {
     const data = evt.data || {};
     switch (evt.eventType) {
       case "assessment_created":
-        return "Assessment created and validated against scope boundaries";
+        return "Assessment initialized and validated against scope boundaries";
       case "scope_validated":
         return "Scope certified: target allowed, no IP rebinding conflicts";
       case "recon_completed":
@@ -78,70 +69,75 @@ export function AuditTimeline({ events }: AuditTimelineProps) {
       case "tool_completed":
         return `Tool completed: ${(data.action as any)?.tool_name || "scan"}`;
       case "finding_verified":
-        return `Finding Verified: ${(data.finding as any)?.title || "Vulnerability confirmed"}`;
+        return `VERIFIED VULNERABILITY: ${(data.finding as any)?.title || "CVE identified"}`;
       case "assessment_paused":
-        return `Assessment paused cleanly. Graph checkpoint saved (${data.checkpoint_id || "chk"})`;
+        return "Assessment execution paused by operator";
       case "assessment_resumed":
-        return "Assessment resumed from latest checkpoint state";
+        return "Assessment execution resumed";
       case "report_generated":
-        return "Executive report and client PDF deliverables generated";
+        return "Cryptographic audit report generated & signed";
       case "assessment_completed":
-        return `Assessment finished. Outcome: ${data.outcome || data.status || "COMPLETED"}`;
+        return "Assessment objectives fully completed";
       case "assessment_failed":
-        return `Assessment failed: ${data.error || "Unknown error"}`;
-      case "node_transition":
-        return `Node transition: ${evt.node || (data as any)?.node || "state machine step"}`;
+        return "Assessment terminated with error";
       default:
-        return `${evt.eventType}: ${JSON.stringify(data)}`;
+        return evt.message || evt.eventType;
     }
   };
 
   return (
-    <div className="glass-panel rounded-2xl border border-cyber-border overflow-hidden flex flex-col h-[520px]">
-      <div className="p-4 border-b border-cyber-border bg-cyber-bg/40 flex items-center justify-between">
+    <Card className="flex flex-col h-[520px]">
+      <CardHeader className="border-b border-border py-3 px-4 flex flex-row items-center justify-between">
         <div className="flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-cyan-400" />
-          <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white">
-            Audit Timeline (Live SSE Feed)
-          </h3>
+          <Terminal className="h-4 w-4 text-primary" />
+          <CardTitle className="text-xs uppercase tracking-wider">
+            Live ReAct Monologue & Audit Log
+          </CardTitle>
         </div>
-        <span className="text-[11px] font-mono text-cyber-muted">
-          {events.length} events logged
-        </span>
-      </div>
+        <Badge variant="outline" className="text-[10px]">
+          {events.length} Telemetry Events
+        </Badge>
+      </CardHeader>
 
-      <div ref={scrollRef} className="p-4 overflow-y-auto space-y-3 font-mono text-xs flex-1">
+      <CardContent
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs"
+      >
         {events.length === 0 ? (
-          <div className="h-full flex items-center justify-center text-cyber-muted">
-            Waiting for agent execution events...
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-2">
+            <Terminal className="h-6 w-6 opacity-40" />
+            <p className="text-xs">Awaiting agent execution telemetry...</p>
           </div>
         ) : (
           events.map((evt, idx) => (
             <div
-              key={`${evt.id}-${idx}`}
-              className="flex items-start gap-3 rounded-lg border border-cyber-border/40 bg-cyber-bg/40 p-2.5 hover:border-cyber-border transition-colors"
+              key={`${evt.timestamp}-${idx}`}
+              className="flex items-start gap-2.5 p-2 rounded hover:bg-muted/40 transition-colors"
             >
-              <div className="mt-0.5 rounded p-1 bg-cyber-panel border border-cyber-border/60">
-                {getEventIcon(evt.eventType)}
-              </div>
-              <div className="flex-1 space-y-1 overflow-hidden">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-white text-[11px]">
-                    {evt.eventType}
+              <div className="mt-0.5 shrink-0">{getEventIcon(evt.eventType)}</div>
+              <div className="flex-1 space-y-1 min-w-0">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-foreground truncate">
+                    {evt.eventType.replace(/_/g, " ").toUpperCase()}
                   </span>
-                  <span className="text-[10px] text-cyber-muted shrink-0">
+                  <span className="text-[10px] text-muted-foreground shrink-0">
                     {new Date(evt.timestamp).toLocaleTimeString()}
                   </span>
                 </div>
-                <p className="text-cyber-text text-[11.5px] leading-relaxed break-words">
+                <p className="text-xs text-muted-foreground leading-relaxed break-words">
                   {getEventLabel(evt)}
                 </p>
+                {Boolean(evt.data?.rationale) && (
+                  <p className="text-[11px] text-primary/90 bg-primary/5 p-1.5 rounded border border-primary/20">
+                    <span className="font-semibold text-primary">Reasoning: </span>
+                    {String(evt.data.rationale)}
+                  </p>
+                )}
               </div>
             </div>
           ))
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
-

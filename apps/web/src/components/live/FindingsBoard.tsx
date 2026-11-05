@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { Bug, ShieldCheck, ExternalLink, Terminal } from "lucide-react";
+import { Bug, ShieldCheck, ExternalLink } from "lucide-react";
 import { Finding } from "@/lib/types";
 import { getSeverityColor } from "@/lib/utils";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface FindingsBoardProps {
   findings: Finding[];
@@ -10,22 +12,22 @@ interface FindingsBoardProps {
 
 export function FindingsBoard({ findings, assessmentId }: FindingsBoardProps) {
   return (
-    <div className="glass-panel rounded-2xl border border-cyber-border p-4 sm:p-5 space-y-4">
-      <div className="flex items-center justify-between">
+    <Card className="space-y-4">
+      <CardHeader className="border-b border-border py-3 px-4 flex flex-row items-center justify-between">
         <div className="flex items-center gap-2">
-          <Bug className="h-4 w-4 text-rose-400" />
-          <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white">
+          <Bug className="h-4 w-4 text-destructive" />
+          <CardTitle className="text-xs uppercase tracking-wider">
             Verified Security Findings
-          </h3>
+          </CardTitle>
         </div>
-        <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">
+        <Badge variant="success">
           {findings.length} Evidence-Backed
-        </span>
-      </div>
+        </Badge>
+      </CardHeader>
 
-      <div className="space-y-3 font-mono">
+      <CardContent className="space-y-3 font-mono p-4">
         {findings.length === 0 ? (
-          <div className="rounded-xl border border-cyber-border/40 bg-cyber-bg/30 p-8 text-center text-xs text-cyber-muted">
+          <div className="rounded-md border border-border bg-muted/20 p-8 text-center text-xs text-muted-foreground">
             No confirmed findings yet. Only findings with verifiable cryptographic proof are promoted.
           </div>
         ) : (
@@ -34,7 +36,7 @@ export function FindingsBoard({ findings, assessmentId }: FindingsBoardProps) {
             return (
               <div
                 key={finding.finding_id}
-                className={`rounded-xl border ${sev.border} ${sev.bg} p-3.5 space-y-2.5 transition-all`}
+                className={`rounded-md border ${sev.border} ${sev.bg} p-3.5 space-y-2.5 transition-all`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1">
@@ -44,37 +46,37 @@ export function FindingsBoard({ findings, assessmentId }: FindingsBoardProps) {
                       >
                         {finding.severity}
                       </span>
-                      <span className="text-xs font-bold text-white tracking-wide">
+                      <span className="text-xs font-bold text-foreground tracking-wide">
                         {finding.title}
                       </span>
                     </div>
-                    <p className="text-[11px] text-cyber-text leading-relaxed">
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
                       {finding.description}
                     </p>
                   </div>
 
-                  <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-300 shrink-0">
-                    <ShieldCheck className="h-3 w-3 text-emerald-400" />
-                    CONFIRMED
-                  </span>
+                  <Badge variant="success" className="gap-1 shrink-0">
+                    <ShieldCheck className="h-3 w-3" />
+                    VERIFIED
+                  </Badge>
                 </div>
 
                 {finding.reproduction_steps && (
-                  <div className="rounded-lg bg-cyber-bg/80 border border-cyber-border/80 p-2 text-[10px] text-cyan-300 overflow-x-auto">
-                    <span className="text-cyber-muted">$ </span>
+                  <div className="rounded bg-muted/60 border border-border p-2 text-[10px] text-foreground overflow-x-auto">
+                    <span className="text-primary font-bold">$ </span>
                     {finding.reproduction_steps}
                   </div>
                 )}
 
                 {/* Evidence Links */}
                 {finding.evidence_ids && finding.evidence_ids.length > 0 && (
-                  <div className="flex items-center gap-2 pt-1 border-t border-cyber-border/40 text-[10px] text-cyber-muted">
+                  <div className="flex items-center gap-2 pt-1 border-t border-border text-[10px] text-muted-foreground">
                     <span>Evidence Vault:</span>
                     {finding.evidence_ids.map((evId) => (
                       <Link
                         key={evId}
                         href={`/assessments/${assessmentId}/evidence?focus=${evId}`}
-                        className="inline-flex items-center gap-1 rounded bg-indigo-500/10 border border-indigo-500/30 px-2 py-0.5 text-indigo-300 hover:text-white transition-colors"
+                        className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-foreground hover:text-primary transition-colors border border-border"
                       >
                         {evId}
                         <ExternalLink className="h-2.5 w-2.5" />
@@ -86,8 +88,7 @@ export function FindingsBoard({ findings, assessmentId }: FindingsBoardProps) {
             );
           })
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
-

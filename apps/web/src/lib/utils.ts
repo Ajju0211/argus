@@ -46,39 +46,28 @@ export function truncateHash(hash: string, length = 8): string {
 export function getSeverityColor(severity: string) {
   switch (severity?.toUpperCase()) {
     case "CRITICAL":
-      return {
-        bg: "bg-rose-500/10",
-        border: "border-rose-500/30",
-        text: "text-rose-400",
-        badge: "bg-rose-500/20 text-rose-300 border-rose-500/40",
-      };
     case "HIGH":
       return {
-        bg: "bg-orange-500/10",
-        border: "border-orange-500/30",
-        text: "text-orange-400",
-        badge: "bg-orange-500/20 text-orange-300 border-orange-500/40",
+        bg: "bg-destructive/10",
+        border: "border-destructive/30",
+        text: "text-destructive",
+        badge: "bg-destructive/15 text-destructive border-destructive/30",
       };
     case "MEDIUM":
       return {
-        bg: "bg-amber-500/10",
-        border: "border-amber-500/30",
-        text: "text-amber-400",
-        badge: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+        bg: "bg-muted",
+        border: "border-border",
+        text: "text-foreground",
+        badge: "bg-muted text-foreground border-border",
       };
     case "LOW":
-      return {
-        bg: "bg-blue-500/10",
-        border: "border-blue-500/30",
-        text: "text-blue-400",
-        badge: "bg-blue-500/20 text-blue-300 border-blue-500/40",
-      };
+    case "INFO":
     default:
       return {
-        bg: "bg-slate-500/10",
-        border: "border-slate-500/30",
-        text: "text-slate-400",
-        badge: "bg-slate-500/20 text-slate-300 border-slate-500/40",
+        bg: "bg-muted/50",
+        border: "border-border",
+        text: "text-muted-foreground",
+        badge: "bg-muted text-muted-foreground border-border",
       };
   }
 }
@@ -87,32 +76,28 @@ export function getStatusColor(status: string) {
   switch (status?.toUpperCase()) {
     case "RUNNING":
       return {
-        badge: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40",
-        dot: "bg-cyan-400 animate-pulse",
-      };
-    case "PAUSED":
-      return {
-        badge: "bg-amber-500/20 text-amber-300 border-amber-500/40",
-        dot: "bg-amber-400",
+        badge: "bg-primary/10 text-primary border-primary/30",
+        dot: "bg-primary animate-pulse",
       };
     case "SUCCESS":
     case "COMPLETED":
       return {
-        badge: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
-        dot: "bg-emerald-400",
+        badge: "bg-primary/10 text-primary border-primary/30",
+        dot: "bg-primary",
       };
     case "FAILED":
     case "CANCELLED":
       return {
-        badge: "bg-rose-500/20 text-rose-300 border-rose-500/40",
-        dot: "bg-rose-400",
+        badge: "bg-destructive/10 text-destructive border-destructive/30",
+        dot: "bg-destructive",
       };
+    case "PAUSED":
     case "READY":
     case "QUEUED":
     default:
       return {
-        badge: "bg-slate-500/20 text-slate-300 border-slate-500/40",
-        dot: "bg-slate-400",
+        badge: "bg-muted text-muted-foreground border-border",
+        dot: "bg-muted-foreground",
       };
   }
 }

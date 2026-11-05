@@ -16,6 +16,9 @@ import {
 import { getAssessment, getRawEvidence } from "@/lib/api";
 import { AssessmentDetail } from "@/lib/types";
 import { truncateHash } from "@/lib/utils";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -79,123 +82,145 @@ export default function EvidenceVaultPage({ params }: PageProps) {
     <div className="space-y-6">
       {/* Breadcrumb Navigation */}
       <div className="flex items-center justify-between text-xs font-mono">
-        <div className="flex items-center gap-2 text-cyber-muted">
-          <Link href={`/assessments/${assessmentId}`} className="hover:text-white flex items-center gap-1 transition-colors">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Link href={`/assessments/${assessmentId}`} className="hover:text-foreground flex items-center gap-1 transition-colors">
             <ArrowLeft className="h-3 w-3" />
             Back to Assessment
           </Link>
           <span>/</span>
-          <span className="text-white">Evidence Vault & Cryptographic Proof</span>
+          <span className="text-foreground">Evidence Vault & Cryptographic Proof</span>
         </div>
       </div>
 
-      <div className="glass-panel-elevated rounded-3xl p-6 sm:p-8 border border-cyber-border space-y-6">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-wide">
-            Cryptographic Evidence Inspector
-          </h1>
-          <p className="text-xs sm:text-sm text-cyber-muted mt-1">
-            Zero-hallucination verification vault. Every confirmed vulnerability links directly to an immutable on-disk artifact.
-          </p>
-        </div>
-
-        {/* Split Screen Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: Artifacts List */}
-          <div className="lg:col-span-4 space-y-3">
-            <div className="text-xs font-mono font-bold uppercase tracking-wider text-cyber-muted px-1">
-              Captured Evidence Artifacts ({assessment?.evidence_refs?.length || 0})
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-xl">Cryptographic Evidence Inspector</CardTitle>
+              <CardDescription>
+                Zero-hallucination verification vault. Every confirmed vulnerability links directly to an immutable on-disk artifact.
+              </CardDescription>
             </div>
-
-            <div className="space-y-2 max-h-[500px] overflow-y-auto">
-              {!assessment?.evidence_refs || assessment.evidence_refs.length === 0 ? (
-                <div className="rounded-xl border border-cyber-border/40 bg-cyber-bg/40 p-6 text-center text-xs font-mono text-cyber-muted">
-                  No artifacts captured yet. Tools are executing...
-                </div>
-              ) : (
-                assessment.evidence_refs.map((ref) => {
-                  const evId = ref.evidence_id || ref.id || "ev-unknown";
-                  const isSelected = evId === selectedEvId;
-                  return (
-                    <div
-                      key={evId}
-                      onClick={() => setSelectedEvId(evId)}
-                      className={`p-3.5 rounded-xl border font-mono text-xs cursor-pointer transition-all ${
-                        isSelected
-                          ? "bg-indigo-600/20 border-indigo-500/60 shadow-lg shadow-indigo-500/10"
-                          : "bg-cyber-bg/50 border-cyber-border/60 hover:border-cyber-border"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-white">{evId}</span>
-                        <span className="rounded bg-cyan-500/10 px-1.5 py-0.5 text-[10px] text-cyan-300 border border-cyan-500/30">
-                          {ref.tool_name || "tool"}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-cyber-muted flex items-center gap-1">
-                        <Lock className="h-3 w-3 text-emerald-400" />
-                        <span>SHA: {truncateHash(ref.sha256 || "", 6)}</span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            <Badge variant="success" className="gap-1.5 font-mono">
+              <Lock className="h-3.5 w-3.5" />
+              Merkle Tamper-Evident Chain
+            </Badge>
           </div>
+        </CardHeader>
 
-          {/* Right Column: Hex / Raw Output Viewer */}
-          <div className="lg:col-span-8 glass-panel rounded-2xl border border-cyber-border overflow-hidden flex flex-col h-[560px]">
-            {/* Inspector Header */}
-            <div className="p-4 border-b border-cyber-border bg-cyber-bg/80 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
-              <div className="flex items-center gap-2">
-                <FileCode className="h-4 w-4 text-cyan-400" />
-                <span className="font-bold text-white">{selectedEvId || "No Artifact Selected"}</span>
-                {selectedRef?.sha256 && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
-                    <ShieldCheck className="h-3 w-3" />
-                    Verified Digest
-                  </span>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Artifact Selector Sidebar */}
+            <div className="lg:col-span-4 space-y-2 font-mono">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground px-1 font-semibold">
+                Captured Artifacts ({assessment?.evidence_refs?.length || 0})
+              </div>
+
+              <div className="space-y-1.5 max-h-[500px] overflow-y-auto pr-1">
+                {!assessment?.evidence_refs || assessment.evidence_refs.length === 0 ? (
+                  <div className="rounded-md border border-border bg-muted/20 p-6 text-center text-xs text-muted-foreground">
+                    No artifacts stored yet.
+                  </div>
+                ) : (
+                  assessment.evidence_refs.map((ref) => {
+                    const evId = ref.evidence_id || ref.id;
+                    const isSelected = evId === selectedEvId;
+                    return (
+                      <button
+                        key={evId}
+                        onClick={() => setSelectedEvId(evId || null)}
+                        className={`w-full text-left p-3 rounded-md border text-xs transition-all ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground border-primary font-semibold shadow-sm"
+                            : "bg-card border-border hover:bg-muted text-foreground"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="truncate">{evId}</span>
+                          <span className="text-[10px] opacity-75">{ref.action_name || ref.tool_name}</span>
+                        </div>
+                        <div className="text-[11px] opacity-75 flex items-center gap-1 mt-1">
+                          <span>SHA256:</span>
+                          <code className="text-[10px] font-mono">
+                            {truncateHash(ref.sha256 || ref.sha256_hash || "", 6)}
+                          </code>
+                        </div>
+                      </button>
+                    );
+                  })
                 )}
               </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCopy}
-                  disabled={!rawContent}
-                  className="flex items-center gap-1.5 rounded-lg border border-cyber-border bg-cyber-panel px-3 py-1 text-xs text-cyber-muted hover:text-white transition-colors"
-                >
-                  {hasCopied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                  {hasCopied ? "Copied" : "Copy"}
-                </button>
-                <button
-                  onClick={handleDownload}
-                  disabled={!rawContent}
-                  className="flex items-center gap-1.5 rounded-lg border border-indigo-500/40 bg-indigo-500/20 px-3 py-1 text-xs text-indigo-300 hover:bg-indigo-500/30 transition-colors"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  Download .raw
-                </button>
-              </div>
             </div>
 
-            {/* Content Display */}
-            <div className="p-4 overflow-auto flex-1 font-mono text-xs bg-cyber-bg/90 text-cyber-text leading-relaxed">
-              {isLoadingContent ? (
-                <div className="h-full flex items-center justify-center text-cyber-muted">
-                  Loading artifact from Evidence Vault...
+            {/* Artifact Content Viewer */}
+            <Card className="lg:col-span-8 overflow-hidden flex flex-col h-[560px]">
+              <CardHeader className="p-4 border-b border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+                <div className="flex items-center gap-2">
+                  <FileCode className="h-4 w-4 text-primary" />
+                  <span className="font-bold text-foreground">{selectedEvId || "No Artifact Selected"}</span>
+                  {selectedRef?.tool_name && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {selectedRef.tool_name}
+                    </Badge>
+                  )}
                 </div>
-              ) : rawContent ? (
-                <pre className="whitespace-pre-wrap break-all">{rawContent}</pre>
-              ) : (
-                <div className="h-full flex items-center justify-center text-cyber-muted">
-                  Select an artifact on the left to inspect raw output.
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopy}
+                    disabled={!rawContent || isLoadingContent}
+                    className="h-7 text-xs gap-1"
+                  >
+                    {hasCopied ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
+                    <span>{hasCopied ? "Copied" : "Copy"}</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDownload}
+                    disabled={!rawContent || isLoadingContent}
+                    className="h-7 text-xs gap-1"
+                  >
+                    <Download className="h-3 w-3" />
+                    <span>Download</span>
+                  </Button>
+                </div>
+              </CardHeader>
+
+              {/* SHA256 & Previous Hash Bar */}
+              {selectedRef && (
+                <div className="bg-muted/20 border-b border-border px-4 py-2 flex flex-wrap items-center gap-4 text-[11px] font-mono text-muted-foreground">
+                  <div>
+                    <span className="font-semibold text-foreground">Hash: </span>
+                    <span className="select-all">{selectedRef.sha256 || selectedRef.sha256_hash}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-foreground">Location: </span>
+                    <span>{selectedRef.file_path || "vault artifact"}</span>
+                  </div>
                 </div>
               )}
-            </div>
+
+              {/* Raw Payload Text */}
+              <div className="p-4 overflow-auto flex-1 font-mono text-xs bg-muted/10 text-foreground leading-relaxed">
+                {isLoadingContent ? (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    Streaming raw artifact payload...
+                  </div>
+                ) : rawContent ? (
+                  <pre className="whitespace-pre-wrap break-all">{rawContent}</pre>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    Select an artifact on the left to inspect its cryptographic verification proof.
+                  </div>
+                )}
+              </div>
+            </Card>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
-

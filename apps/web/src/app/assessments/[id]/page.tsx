@@ -9,6 +9,7 @@ import { AuditTimeline } from "@/components/live/AuditTimeline";
 import { TopologyGrid } from "@/components/live/TopologyGrid";
 import { FindingsBoard } from "@/components/live/FindingsBoard";
 import { pauseAssessment, resumeAssessment, cancelAssessment } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -63,8 +64,8 @@ export default function AssessmentLivePage({ params }: PageProps) {
   if (!assessment) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></div>
-        <p className="text-xs font-mono text-cyber-muted">Connecting to Assessment Stream...</p>
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+        <p className="text-xs font-mono text-muted-foreground">Connecting to Assessment Stream...</p>
       </div>
     );
   }
@@ -73,25 +74,25 @@ export default function AssessmentLivePage({ params }: PageProps) {
     <div className="space-y-6">
       {/* Breadcrumb Nav */}
       <div className="flex items-center justify-between text-xs font-mono">
-        <div className="flex items-center gap-2 text-cyber-muted">
-          <Link href="/" className="hover:text-white flex items-center gap-1 transition-colors">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Link href="/" className="hover:text-foreground flex items-center gap-1 transition-colors">
             <ArrowLeft className="h-3 w-3" />
             Command Center
           </Link>
           <span>/</span>
-          <span className="text-white">{assessment.name || assessment.id}</span>
+          <span className="text-foreground font-semibold">{assessment.name || assessment.id}</span>
         </div>
 
         <div className="flex items-center gap-3">
           <Link
             href={`/assessments/${assessmentId}/evidence`}
-            className="text-cyber-muted hover:text-white transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             Evidence Vault →
           </Link>
           <Link
             href={`/assessments/${assessmentId}/report`}
-            className="text-cyber-muted hover:text-white transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             Executive Report →
           </Link>
@@ -125,4 +126,3 @@ export default function AssessmentLivePage({ params }: PageProps) {
     </div>
   );
 }
-
