@@ -64,15 +64,16 @@ To understand ARGUS completely, let's look through the eyes of the 5 key persona
   - **Full Audit Trail:** A complete JSON log of every decision the agent made, when it made it, and which policy rule permitted it.
 
 ### 3. The AI Agent Orchestrator's POV ("The Brain")
-- **How it operates:** The agent does not execute random scripts. It operates on a **Directed Acyclic Graph (DAG) state machine** built on **LangGraph**.
-- **The Thought Cycle:**
-  1. **Initialize:** Read the target scope and set up the mission parameters.
-  2. **Recon:** Gather open ports, discover HTTP endpoints, and perform OSINT queries.
-  3. **Probe:** Check server response headers, detect technologies, and look for misconfigurations.
-  4. **Exploit:** If a potential flaw is detected (e.g., SQL syntax error), try a safe proof-of-concept payload (e.g., `OR '1'='1' LIMIT 1`).
-  5. **Verify:** Replay the attack through an independent verification check to confirm reproducibility.
-  6. **Report:** Synthesize findings, calculate risk scores, and compile downloadable PDF and HTML security reports.
-- **Budget Control:** The agent tracks its API token usage and tool call counts. If it starts looping or burning tokens, circuit breakers trigger to prevent run-away bills.
+- **How it operates:** The agent does not execute a rigid, one-way script. It runs a **dynamic ReAct (Reason + Act) loop** powered by a **LangGraph state machine**.
+- **The Core Loop (Think ➡️ Act ➡️ Observe ➡️ Think again):**
+  1. **Reason (Plan):** The LLM reviews the target, available tools, previous observations, and action history. It reasons about what hypothesis to test next.
+  2. **Gate (Policy):** The Policy Firewall intercepts the proposed action before it can touch the network.
+  3. **Act (Execute):** The approved tool runs (e.g., HTTP probe, port scanner, SQLi tester).
+  4. **Observe (Verify & Hash):** The raw output is cryptographically stored in the Evidence Vault and parsed into structured observations.
+  5. **Evaluate (Loop or Exit):** The agent checks: *"Is our objective achieved? Did we find what we needed? Do we still have iteration budget?"*
+     - If **NO**, it loops back to **Step 1 (Reason)** with the brand-new observations loaded into the LLM context!
+     - If **YES**, it breaks the loop and generates the final report.
+- **Budget & Loop Controls:** The loop is bounded by an execution budget (`max_iterations`, default 20) and duplicate action fingerprinting so the agent never gets stuck in infinite loops.
 
 ### 4. The Full-Stack Developer's POV ("The Architecture")
 - **Frontend:** Next.js 15 (React 19, Tailwind CSS, Lucide icons). It uses **Server-Sent Events (SSE)** to stream telemetry events smoothly without polling.
@@ -147,7 +148,109 @@ Every component listed below is **100% written, verified, and operational**:
 
 ---
 
-## 5. How Things Proceed: The End-to-End Life of a Scan
+## 5. The Heart of ARGUS: The ReAct Reasoning Loop
+
+A common misconception when first viewing an agent architecture is to think of it as a **linear conveyor belt** (Recon ➡️ Probe ➡️ Exploit ➡️ Verify ➡️ Report).
+
+**ARGUS is NOT a linear pipeline.** Traditional vulnerability scanners (like Nessus or Nikto) are linear pipelines: they run a fixed list of tests and dump a report. ARGUS is fundamentally different: it is an **iterative ReAct (Reasoning + Acting) loop** built on a cyclic **LangGraph state machine**.
+
+```
+                           [START]
+                              │
+                              ▼
+                       validate_scope
+                              │
+                              ▼
+                            recon  (Initial Port & Banner Discovery)
+                              │
+                              ▼
+                    normalize_observations
+                              │
+            ┌─────────────────┴─────────────────┐
+            │                                   ▼
+            │        ┌──────────────────► plan_action  ◄───────────────────┐
+            │        │               (LLM REASONING NODE)                  │
+            │        │         "Based on what I observed, what             │
+            │        │          hypothesis should I test next?"            │
+            │        │                          │                          │
+            │        │                          ▼                          │
+            │        │                     policy_gate                     │
+            │   THE  │             (Deterministic Firewall Check)          │
+            │        │                          │                          │
+            │  REACT │                          ▼                          │
+            │        │                    execute_tool                     │
+            │  LOOP  │             (Run HTTP probe, nuclei, etc.)          │
+            │        │                          │                          │
+            │        │                          ▼                          │
+            │        │                    verify_finding                   │
+            │        │             (Capture SHA-256 evidence vault)        │
+            │        │                          │                          │
+            │        │                          ▼                          │
+            │        │                 evaluate_completion                 │
+            │        │             "Is objective met? Budget OK?"          │
+            │        │                          │                          │
+            │        └──────── NO ──────────────┴────── YES ────────┐      │
+            │              (Loop back with new                      │      │
+            │             observations for next                     ▼      │
+            │               reasoning step!)                      report   │
+            │                                                       │      │
+            └───────────────────────────────────────────────────────┴──────┘
+                                                                    │
+                                                                   END
+```
+
+### Trace: How an Attack Unfolds Through the Reasoning Loop
+
+Here is how the reasoning loop works across 4 distinct iterations during an assessment against a web application:
+
+#### **Iteration 1: Surface Discovery & Reconnaissance**
+- **Action (Act):** Initial port discovery scans the target `http://localhost:5000`.
+- **Observation:** Port 5000 is open, serving HTTP with a `Werkzeug/3.0 Python` server banner.
+- **Loop Evaluation:** Objective not met yet (we haven't found or verified any vulnerabilities). **Loop back to `plan_action`!**
+
+#### **Iteration 2: Endpoint Enumeration & Hypothesis Formulation**
+- **Reasoning (Think):** The LLM receives the observation from Iteration 1. It reasons:  
+  > *"We have an HTTP service on port 5000. Before attacking, I need to know what endpoints exist. I will call `http_probe` to crawl common routes."*
+- **Policy Gate:** Firewall inspects `http_probe` against `http://localhost:5000`. Permitted.
+- **Action (Act):** Probe crawls routes and discovers `/api/v1/search?q=` and `/login`.
+- **Observation:** Endpoint `/api/v1/search` reflects user input in JSON output.
+- **Loop Evaluation:** We have endpoints, but no confirmed vulnerability. **Loop back to `plan_action`!**
+
+#### **Iteration 3: Vulnerability Hypothesis & Non-Destructive Probe**
+- **Reasoning (Think):** The LLM receives the endpoint list. It reasons:  
+  > *"The `/api/v1/search?q=` parameter reflects user data without sanitization. This is a strong candidate for SQL Injection. I will formulate a harmless test: `' OR '1'='1`."*
+- **Policy Gate:** Firewall checks the payload. It confirms: non-destructive (no `DROP`, no `DELETE`), within target scope. Approved.
+- **Action (Act):** Sends the canary payload to the search parameter.
+- **Observation:** The server responds with an SQLite syntax error: `OperationalError: unrecognized token near OR`.
+- **Loop Evaluation:** A syntax error indicates a flaw, but it is not yet a verified vulnerability. **Loop back to `plan_action`!**
+
+#### **Iteration 4: Proof-of-Concept & Cryptographic Verification**
+- **Reasoning (Think):** The LLM receives the database syntax error. It reasons:  
+  > *"The syntax error confirms SQL injection is possible. I will now send a structured proof-of-concept payload to extract the database version safely."*
+- **Action (Act):** Sends `' UNION SELECT sqlite_version(), null --`.
+- **Observation:** The response returns `3.43.2` inside the JSON payload.
+- **Verification (`verify_finding`):** The engine re-tests the proof independently.
+  - Generates immutable SHA-256 fingerprint of the request/response.
+  - Saves finding as **`CONFIRMED`** with exact curl reproduction commands.
+- **Loop Evaluation:** Objective achieved (confirmed high-severity vulnerability with cryptographic proof). **Exit loop ➡️ proceed to `report`!**
+
+---
+
+### Why Did the System Look Like a Single Pipeline in Tests?
+
+If you ran the system in **offline simulation mode** (without setting `BIFROST_API_KEY`), you might have noticed it finished very quickly in what looked like a single step. 
+
+Here is why:
+1. **The Default Mock Model Gateway:** In unit tests or offline simulations, `_default_mock_model_gateway` returns `OBJECTIVE_ACHIEVED` on the first iteration so tests can run in 50 milliseconds without calling external APIs.
+2. **Live Mode with LLM (Bifrost/Claude):** When connected to an LLM provider, `format_planning_prompt` dynamically formats previous observations, discovered services, and action history into the prompt at every step. The model decides dynamically whether to run another tool, do threat intel research via Tavily, or declare the mission complete.
+3. **Safety Bounding:** To prevent an agent from looping forever or racking up massive API bills, the loop has hard limits:
+   - **`max_iterations`** (default 20): Maximum times the reasoning loop can cycle.
+   - **Duplicate Action Prevention:** If the LLM proposes an identical action already in `action_history`, the engine blocks it and forces the model to pivot to a new strategy.
+   - **Circuit Breaker:** If 3 consecutive tool calls fail or time out, `adaptive_recovery` triggers backoff and halts safely.
+
+---
+
+## 6. How Things Proceed: The End-to-End Life of a Scan
 
 Here is the exact step-by-step journey of what happens inside the computer when you run an assessment:
 
@@ -196,7 +299,7 @@ Here is the exact step-by-step journey of what happens inside the computer when 
 
 ---
 
-## 6. Networking, Ports & Redirection Guide
+## 7. Networking, Ports & Redirection Guide
 
 A common question when running multi-service architectures is: *"How do ports talk to each other, and how do requests get directed?"*
 
@@ -253,7 +356,7 @@ Here is the exact network map:
 
 ---
 
-## 7. How to Run Everything (Quickstart)
+## 8. How to Run Everything (Quickstart)
 
 ### Method A: The One-Command Turnkey Way (Docker)
 This starts all three services in isolated, production-ready containers:
@@ -318,7 +421,7 @@ npm run build
 
 ---
 
-## 8. Summary Table: Where Files Live & What They Do
+## 9. Summary Table: Where Files Live & What They Do
 
 | Directory | What Lives Inside |
 | :--- | :--- |
@@ -336,10 +439,11 @@ npm run build
 
 ---
 
-## 9. Conclusion & Mental Model
+## 10. Conclusion & Mental Model
 
 When you think about ARGUS, keep this simple mental model in mind:
 
 > **"ARGUS is an AI ethical hacker whose hands are placed inside safety-gloved mechanical arms (Policy Firewall). It can look at targets, find weak spots, and demonstrate proof-of-concepts, but the mechanical arms physically lock up if it ever tries to touch an unauthorized server or cause real damage. Everything it does is recorded on camera with cryptographic timestamps (Evidence Vault) and broadcast live to your command screen (Next.js Dashboard)."**
 
 Everything is built, verified, type-safe, containerized, and ready to demonstrate!
+
