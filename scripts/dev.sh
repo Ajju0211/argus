@@ -33,6 +33,14 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM EXIT
 
+# Check if self-hosted Bifrost is running
+if curl -s -f http://localhost:8080/healthz >/dev/null 2>&1 || curl -s -f http://localhost:8080 >/dev/null 2>&1; then
+    echo "🌐 [Bifrost OSS] Detected running on http://localhost:8080"
+else
+    echo "ℹ️  [Bifrost OSS] Not detected on http://localhost:8080"
+    echo "    To start local Bifrost: docker run -d -p 8080:8080 -e ANTHROPIC_API_KEY=... maximhq/bifrost"
+fi
+
 # 1. Launch FastAPI Backend
 echo "🚀 [1/2] Starting FastAPI Backend on http://localhost:8000..."
 .venv/bin/uvicorn apps.api.main:app --port 8000 --reload &

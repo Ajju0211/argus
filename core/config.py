@@ -60,11 +60,15 @@ class Settings(BaseSettings):
     MAX_CONSECUTIVE_FAILURES: int = Field(default=3, ge=1, le=10)
 
     # -------------------------------------------------------------
-    # Sponsor Gateway: Maxim AI Bifrost
+    # Sponsor Gateway: Maxim AI Bifrost (Self-Hosted Open-Source)
     # -------------------------------------------------------------
-    BIFROST_API_KEY: str = Field(default="", description="Maxim AI Bifrost API Gateway Key")
+    BIFROST_API_KEY: str = Field(
+        default="",
+        description="Bifrost Virtual Key (e.g. sk-bf-* or sk-bf-local for self-hosted instances)",
+    )
     BIFROST_BASE_URL: str = Field(
-        default="https://bifrost.maxim.ai/v1", description="Bifrost proxy base URL"
+        default="http://localhost:8080/v1",
+        description="Self-hosted open-source Bifrost proxy base URL (http://localhost:8080/v1)",
     )
     BIFROST_PRIMARY_MODEL: str = Field(
         default="claude-3-5-sonnet-20241022", description="Default high-intelligence primary model"

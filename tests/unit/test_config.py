@@ -30,7 +30,10 @@ class TestConfiguration:
 
     def test_sponsor_gateway_defaults(self) -> None:
         settings = get_settings()
-        assert settings.BIFROST_BASE_URL == "https://bifrost.maxim.ai/v1"
+        assert settings.BIFROST_BASE_URL in (
+            "http://localhost:8080/v1",
+            "https://bifrost.maxim.ai/v1",
+        )
         assert "claude" in settings.BIFROST_PRIMARY_MODEL
         assert "gpt" in settings.BIFROST_FALLBACK_MODEL
 

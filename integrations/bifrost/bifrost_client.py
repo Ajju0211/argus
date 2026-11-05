@@ -85,11 +85,14 @@ class BifrostClient:
         """
         if not self.api_key:
             raise BifrostAPIError(
-                401, "Missing Bifrost API key. Set ARGUS_BIFROST_API_KEY in environment."
+                401,
+                "Missing Bifrost API key. Set ARGUS_BIFROST_API_KEY in environment "
+                "(use your Bifrost virtual key or 'sk-bf-local' when self-hosting).",
             )
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
+            "x-bf-vk": self.api_key,
             "X-Bifrost-Fallback": self.fallback_model,
             "Content-Type": "application/json",
         }

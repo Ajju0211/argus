@@ -309,7 +309,8 @@ Here is the exact network map:
 ┌────────────────────────────────────────────────────────────────────────┐
 │                          HOST MACHINE (Your Mac)                       │
 │                                                                        │
-│   Browser: http://localhost:3000                                       │
+│   Browser: http://localhost:3000 (Cyber Dashboard)                     │
+│            http://localhost:8080 (Bifrost Gateway Web UI)              │
 │      │                                                                 │
 │      ▼                                                                 │
 │   ┌───────────────────────────────────────────────────────────────┐    │
@@ -325,16 +326,18 @@ Here is the exact network map:
 │   │ - Server: Uvicorn / Python 3.12                               │    │
 │   │ - Database: argus.db (SQLite WAL)                             │    │
 │   │ - Interactive Swagger Docs: http://localhost:8000/docs        │    │
+│   │ - Routes LLM reasoning prompts via Bifrost (:8080)            │    │
 │   │ - Attacks target via HTTP: http://localhost:5000               │    │
-│   └───────────────────────────────┬───────────────────────────────┘    │
-│                                   │                                    │
-│                                   ▼                                    │
-│   ┌───────────────────────────────────────────────────────────────┐    │
-│   │ Mock Target Vulnerability Lab (Port 5000)                     │    │
-│   │ - Server: Python Flask                                        │    │
-│   │ - Contains deliberate safe vulnerabilities (SQLi, IDOR, XSS)  │    │
-│   │ - Accessible at: http://localhost:5000                        │    │
-│   └───────────────────────────────────────────────────────────────┘    │
+│   └──────────────┬────────────────────────────────┬───────────────┘    │
+│                  │                                │                    │
+│                  ▼                                ▼                    │
+│   ┌───────────────────────────────┐┌──────────────────────────────┐    │
+│   │ Bifrost OSS Gateway (Port 8080││ Mock Target Lab (Port 5000)  │    │
+│   │ - Server: Go (maximhq/bifrost)││ - Vulnerable fixture         │    │
+│   │ - Web UI: Live logs & metrics ││ - Safe Apache 2.4.49 target  │    │
+│   │ - Auto-fails over to GPT-4o   ││ - Bound to private network   │    │
+│   │ - Calls Anthropic/OpenAI APIs ││                              │    │
+│   └───────────────────────────────┘└──────────────────────────────┘    │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
