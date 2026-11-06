@@ -43,7 +43,7 @@ export function AppHeader() {
             <img
               src="/argus_logo.png"
               alt="ARGUS"
-              className="h-6 w-auto object-contain rounded-xs dark:invert-0 invert"
+              className="h-7 w-7 object-contain rounded-xs dark:invert-0 invert"
             />
             <span className="font-sans font-semibold text-xs tracking-tight text-foreground">
               ARGUS
