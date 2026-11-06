@@ -440,7 +440,7 @@ schema_version: "1.0"
 assessment_id: "asm-s10-loopback"
 name: "Loopback Scope"
 created_at: "2026-11-04T12:00:00Z"
-expires_at: "2026-11-05T12:00:00Z"
+expires_at: "2027-11-05T12:00:00Z"
 targets:
   allowed_hosts: []
   allowed_subnets: ["127.0.0.0/8"]
@@ -461,7 +461,7 @@ schema_version: "1.0"
 assessment_id: "asm-s10-linklocal"
 name: "Metadata Scope"
 created_at: "2026-11-04T12:00:00Z"
-expires_at: "2026-11-05T12:00:00Z"
+expires_at: "2027-11-05T12:00:00Z"
 targets:
   allowed_hosts: []
   allowed_subnets: ["169.254.0.0/16"]
@@ -482,7 +482,7 @@ schema_version: "1.0"
 assessment_id: "asm-s10-conflict"
 name: "Conflict Scope"
 created_at: "2026-11-04T12:00:00Z"
-expires_at: "2026-11-05T12:00:00Z"
+expires_at: "2027-11-05T12:00:00Z"
 targets:
   allowed_hosts: ["192.168.100.5"]
   denied_hosts: ["192.168.100.5"]

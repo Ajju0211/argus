@@ -4,24 +4,21 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Terminal,
+  LayoutDashboard,
   PlusCircle,
   ShieldCheck,
   Database,
-  ExternalLink,
-  Shield,
-  Activity,
-  Cpu,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { useSidebar } from "@/components/layout/sidebar-context";
 
 interface NavItem {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  isExternal?: boolean;
   badge?: string;
 }
 
@@ -32,23 +29,22 @@ interface NavSection {
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    domain: "Assessment Operations",
+    domain: "Operations",
     items: [
       {
         title: "Command Center",
         href: "/",
-        icon: Terminal,
+        icon: LayoutDashboard,
       },
       {
         title: "New Assessment",
         href: "/new",
         icon: PlusCircle,
-        badge: "Target",
       },
     ],
   },
   {
-    domain: "Policy & Governance",
+    domain: "Security Policy",
     items: [
       {
         title: "Scope Firewall",
@@ -58,24 +54,12 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    domain: "Evidence Vault",
+    domain: "Compliance",
     items: [
       {
-        title: "Merkle Audit Chain",
+        title: "Evidence Vault",
         href: "/evidence",
         icon: Database,
-      },
-    ],
-  },
-  {
-    domain: "AI Gateway Engine",
-    items: [
-      {
-        title: "Bifrost Gateway UI",
-        href: "http://localhost:8080",
-        icon: Cpu,
-        isExternal: true,
-        badge: ":8080",
       },
     ],
   },
@@ -83,95 +67,108 @@ const NAV_SECTIONS: NavSection[] = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { isCollapsed, toggleSidebar } = useSidebar();
 
   return (
-    <aside className="w-64 border-r border-border bg-card/60 backdrop-blur-md flex flex-col shrink-0 h-screen sticky top-0">
-      {/* Brand & Identity */}
-      <div className="h-16 border-b border-border px-5 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
-            <Shield className="h-4 w-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-sm font-bold tracking-wider text-foreground">
+    <aside
+      className={cn(
+        "flex flex-col shrink-0 h-dvh bg-sidebar select-none border-r border-border/70 transition-[width] duration-200 ease-in-out overflow-hidden",
+        isCollapsed ? "w-16" : "w-60"
+      )}
+    >
+      {/* Brand & Identity Header */}
+      <div className="h-[3.25rem] px-3.5 flex items-center justify-between shrink-0">
+        {!isCollapsed ? (
+          <>
+            <Link href="/" className="flex items-center gap-2.5 min-w-0 group">
+              <img
+                src="/argus_logo.png"
+                alt="ARGUS"
+                className="h-6 w-auto object-contain shrink-0 rounded-xs dark:invert-0 invert"
+              />
+              <span className="font-sans text-sm font-semibold tracking-tight text-foreground truncate">
                 ARGUS
               </span>
-              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-muted text-muted-foreground border border-border">
-                OSS
-              </span>
-            </div>
-            <p className="text-[10px] font-mono text-muted-foreground">
-              Zero-Hallucination SecOps
-            </p>
+            </Link>
+            <button
+              onClick={toggleSidebar}
+              type="button"
+              className="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex h-7 w-7 items-center justify-center rounded-md transition-colors shrink-0"
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          </>
+        ) : (
+          <div className="w-full flex items-center justify-center">
+            <button
+              onClick={toggleSidebar}
+              type="button"
+              className="group flex h-8 w-8 items-center justify-center rounded-md hover:bg-sidebar-accent transition-colors"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <img
+                src="/argus_logo.png"
+                alt="ARGUS"
+                className="h-5 w-auto object-contain rounded-xs dark:invert-0 invert group-hover:hidden"
+              />
+              <PanelLeftOpen className="h-4 w-4 text-foreground hidden group-hover:block" />
+            </button>
           </div>
-        </Link>
+        )}
       </div>
 
-      {/* Navigation Sections (Domain-Driven) */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+      {/* Navigation Sections */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4 custom-scrollbar">
         {NAV_SECTIONS.map((section) => (
           <div key={section.domain} className="space-y-1">
-            <h4 className="px-3 text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
-              {section.domain}
-            </h4>
+            {!isCollapsed && (
+              <h4 className="px-2.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                {section.domain}
+              </h4>
+            )}
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const isActive =
                   item.href === "/"
                     ? pathname === "/"
-                    : !item.isExternal && pathname.startsWith(item.href);
+                    : pathname.startsWith(item.href);
                 const Icon = item.icon;
-
-                if (item.isExternal) {
-                  return (
-                    <a
-                      key={item.href}
-                      href={item.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between rounded-md px-3 py-2 text-xs font-mono text-muted-foreground hover:bg-accent hover:text-foreground transition-colors group"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                        <span>{item.title}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {item.badge && (
-                          <Badge variant="outline" className="text-[9px] py-0 px-1">
-                            {item.badge}
-                          </Badge>
-                        )}
-                        <ExternalLink className="h-3 w-3 opacity-60" />
-                      </div>
-                    </a>
-                  );
-                }
 
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    title={isCollapsed ? item.title : undefined}
                     className={cn(
-                      "flex items-center justify-between rounded-md px-3 py-2 text-xs font-mono transition-colors",
+                      "flex items-center rounded-md text-xs transition-colors group",
+                      isCollapsed
+                        ? "h-9 w-9 mx-auto justify-center"
+                        : "justify-between px-2.5 py-1.5",
                       isActive
-                        ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                        ? "bg-accent text-accent-foreground font-medium shadow-2xs"
+                        : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                     )}
                   >
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <Icon
                         className={cn(
-                          "h-4 w-4",
-                          isActive ? "text-primary-foreground" : "text-muted-foreground"
+                          "h-4 w-4 shrink-0 transition-colors",
+                          isActive
+                            ? "text-foreground"
+                            : "text-muted-foreground group-hover:text-foreground"
                         )}
                       />
-                      <span>{item.title}</span>
+                      {!isCollapsed && (
+                        <span className="truncate">{item.title}</span>
+                      )}
                     </div>
-                    {item.badge && (
+                    {!isCollapsed && item.badge && (
                       <Badge
-                        variant={isActive ? "secondary" : "outline"}
-                        className="text-[9px] py-0 px-1"
+                        variant="secondary"
+                        className="text-[9px] py-0 px-1 border-border/50 font-normal"
                       >
                         {item.badge}
                       </Badge>
@@ -184,29 +181,26 @@ export function AppSidebar() {
         ))}
       </nav>
 
-      {/* Infrastructure Telemetry & Tool Health Status */}
-      <div className="p-3 border-t border-border space-y-2">
-        <div className="rounded-md border border-border bg-muted/40 p-2.5 space-y-1.5 text-[11px] font-mono">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <Activity className="h-3 w-3 text-primary animate-pulse" />
-              Bifrost Gateway
+      {/* Footer Bar: System Status */}
+      <div className="p-2.5 border-t border-border/60 shrink-0">
+        {!isCollapsed ? (
+          <div className="flex items-center justify-between px-2 py-1.5 rounded-md bg-muted/40 border border-border/50 text-[11px]">
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Agent Engine
             </span>
-            <span className="text-primary font-bold">ONLINE</span>
+            <span className="text-foreground/80 font-medium text-[10px] tracking-wide">
+              READY
+            </span>
           </div>
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span>Target Lab</span>
-            <span className="text-foreground">:8888</span>
+        ) : (
+          <div className="flex items-center justify-center py-1">
+            <span
+              className="h-2 w-2 rounded-full bg-emerald-500"
+              title="Agent Engine: READY"
+            />
           </div>
-        </div>
-
-        {/* Footer Bar: Theme Toggle & Version */}
-        <div className="flex items-center justify-between px-1">
-          <ThemeToggle />
-          <span className="text-[10px] font-mono text-muted-foreground">
-            ARGUS v1.0
-          </span>
-        </div>
+        )}
       </div>
     </aside>
   );

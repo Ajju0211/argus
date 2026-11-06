@@ -62,9 +62,9 @@ function TabsTrigger({
       aria-selected={isSelected}
       onClick={() => context.onValueChange(value)}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-mono font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
         isSelected
-          ? "bg-background text-foreground shadow-sm font-semibold"
+          ? "bg-background text-foreground shadow-xs font-medium"
           : "hover:text-foreground",
         className
       )}
@@ -102,3 +102,4 @@ function TabsContent({
 }
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };
+

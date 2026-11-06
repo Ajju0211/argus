@@ -82,6 +82,15 @@ class Finding(BaseModel):
     research_source_ids: list[str] = Field(
         default_factory=list, description="External intelligence / advisory IDs (Tavily/NVD)"
     )
+    proof_id: str | None = Field(
+        default=None, description="Cryptographic Proof Capsule ID"
+    )
+    ledger_root: str | None = Field(
+        default=None, description="Merkle ledger root hash at verification time"
+    )
+    proof_summary: dict[str, Any] | None = Field(
+        default=None, description="Inclusion proof and verification status"
+    )
     created_at: datetime = Field(..., description="UTC creation timestamp")
 
     @model_validator(mode="after")

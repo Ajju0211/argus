@@ -417,7 +417,12 @@ class TestIntegrityAndWiring:
     ) -> None:
         """C-05: No Bifrost key and no simulation must not produce a mock success."""
         settings = get_settings().model_copy(
-            update={"BIFROST_API_KEY": "", "SIMULATION_MODE": False}
+            update={
+                "BIFROST_API_KEY": "",
+                "BIFROST_ADMIN_USERNAME": "",
+                "BIFROST_ADMIN_PASSWORD": "",
+                "SIMULATION_MODE": False,
+            }
         )
 
         with patch("engine.graph.get_settings", return_value=settings):
@@ -436,7 +441,12 @@ class TestIntegrityAndWiring:
     ) -> None:
         """C-05: An explicit simulation run labels its mock planner decisions."""
         settings = get_settings().model_copy(
-            update={"BIFROST_API_KEY": "", "SIMULATION_MODE": True}
+            update={
+                "BIFROST_API_KEY": "",
+                "BIFROST_ADMIN_USERNAME": "",
+                "BIFROST_ADMIN_PASSWORD": "",
+                "SIMULATION_MODE": True,
+            }
         )
 
         with patch("engine.graph.get_settings", return_value=settings):

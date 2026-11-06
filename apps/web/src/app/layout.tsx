@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SidebarProvider } from "@/components/layout/sidebar-context";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
 
 export const metadata: Metadata = {
-  title: "ARGUS — Autonomous Security Testing",
-  description: "Autonomous Security Testing. Verified by Evidence.",
+  title: "ARGUS — Autonomous Security Operations",
+  description: "Autonomous Security Operations. Verified by Cryptographic Evidence.",
 };
 
 export default function RootLayout({
@@ -16,22 +17,26 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
+      <body className="h-dvh w-full overflow-hidden bg-background text-foreground antialiased selection:bg-foreground/10 selection:text-foreground">
         <ThemeProvider defaultTheme="dark">
-          <div className="flex min-h-screen">
-            {/* Desktop Domain-Driven Sidebar */}
-            <div className="hidden md:block">
-              <AppSidebar />
-            </div>
+          <SidebarProvider>
+            <div className="flex h-dvh w-full overflow-hidden">
+              {/* Desktop Collapsible Sidebar */}
+              <div className="hidden md:block shrink-0">
+                <AppSidebar />
+              </div>
 
-            {/* Main Application Shell */}
-            <div className="flex-1 flex flex-col min-w-0">
-              <AppHeader />
-              <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-                {children}
-              </main>
+              {/* Main Application Shell with Floating Workbench Card */}
+              <div className="flex h-dvh w-full min-w-0 flex-col overflow-hidden">
+                <AppHeader />
+                <div className="custom-scrollbar content-container mx-0 min-h-0 min-w-0 flex-1 overflow-auto border-t md:border border-border/80 bg-card md:mr-3 md:mb-3 md:rounded-lg shadow-2xs">
+                  <main className="custom-scrollbar relative flex h-full min-h-0 flex-col overflow-y-auto px-4 py-4 md:px-8 md:py-6">
+                    {children}
+                  </main>
+                </div>
+              </div>
             </div>
-          </div>
+          </SidebarProvider>
         </ThemeProvider>
       </body>
     </html>

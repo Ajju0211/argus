@@ -11,22 +11,16 @@ export function ThemeToggle({ className }: { className?: string }) {
   return (
     <Button
       variant="ghost"
-      size="sm"
+      size="icon"
       onClick={toggleTheme}
-      className={className}
+      className={`h-8 w-8 text-muted-foreground hover:text-foreground ${className || ""}`}
       aria-label="Toggle theme mode"
       title={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} mode`}
     >
       {resolvedTheme === "dark" ? (
-        <>
-          <Sun className="h-4 w-4 text-primary" />
-          <span className="text-[11px] font-mono hidden sm:inline">Light</span>
-        </>
+        <Sun className="h-4 w-4 transition-transform" />
       ) : (
-        <>
-          <Moon className="h-4 w-4 text-primary" />
-          <span className="text-[11px] font-mono hidden sm:inline">Dark</span>
-        </>
+        <Moon className="h-4 w-4 transition-transform" />
       )}
     </Button>
   );

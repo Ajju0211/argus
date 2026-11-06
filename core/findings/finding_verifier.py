@@ -7,6 +7,7 @@ active reproducibility proof.
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from packages.contracts.findings import (
     ConfidenceLevel,
@@ -60,6 +61,9 @@ class FindingVerifier:
         reproduction_steps: str,
         impact: str | None = None,
         remediation: str | None = None,
+        proof_id: str | None = None,
+        ledger_root: str | None = None,
+        proof_summary: dict[str, Any] | None = None,
     ) -> Finding:
         """Promotes a finding to CONFIRMED based on verified reproducibility evidence."""
         if not verification_evidence_id:
@@ -84,6 +88,9 @@ class FindingVerifier:
             remediation=remediation or finding.remediation,
             evidence_ids=updated_evidence,
             research_source_ids=finding.research_source_ids,
+            proof_id=proof_id or finding.proof_id,
+            ledger_root=ledger_root or finding.ledger_root,
+            proof_summary=proof_summary or finding.proof_summary,
             created_at=finding.created_at,
         )
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { Cpu, DollarSign, Clock, Layers, Pause, Play, Square, FileText } from "lucide-react";
+import { useState } from "react";
+import { Shield, Clock, Layers, Pause, Play, Square, FileText, Check, Copy } from "lucide-react";
 import { AssessmentDetail } from "@/lib/types";
-import { formatCurrency, getStatusColor } from "@/lib/utils";
+import { getStatusColor } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,66 +26,74 @@ export function BifrostHUD({
   isActionLoading = false,
 }: BifrostHUDProps) {
   const statusInfo = getStatusColor(assessment.status);
-  const budget = assessment.budget || {};
-  const tokens = budget.tokens_consumed || (assessment.telemetry?.length ? assessment.telemetry.length * 320 : 1840);
-  const cost = budget.estimated_cost_usd || (tokens / 1_000_000) * 15.0;
+  const [copied, setCopied] = useState(false);
+
+  const targetValue = assessment.target?.value || "Target Unset";
+  const assetsCount = assessment.discovered_assets?.length || 0;
+  const servicesCount = assessment.discovered_services?.length || 0;
+  const findingsCount = assessment.findings?.length || 0;
+
+  const handleCopyTarget = () => {
+    navigator.clipboard.writeText(targetValue);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
-    <Card className="mb-6">
+    <Card className="mb-6 border-border/70 bg-card">
       <CardContent className="p-4 sm:p-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Left: Target & Status */}
           <div className="flex flex-wrap items-center gap-3">
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono font-bold border ${statusInfo.badge}`}>
-              <span className={`h-2 w-2 rounded-full ${statusInfo.dot}`}></span>
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono font-medium border ${statusInfo.badge}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${statusInfo.dot}`}></span>
               {assessment.status}
             </span>
 
-            <span className="text-border">|</span>
+            <span className="text-border/60">|</span>
 
-            <div className="font-mono text-sm sm:text-base font-bold text-foreground tracking-wide">
-              {assessment.target?.value || "Target Unset"}
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm sm:text-base font-semibold text-foreground tracking-tight">
+                {targetValue}
+              </span>
+              <button
+                onClick={handleCopyTarget}
+                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted/50"
+                title="Copy Target"
+              >
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 opacity-60" />}
+              </button>
             </div>
 
             {assessment.simulation && (
-              <Badge variant="outline" className="text-[10px]">
-                SIMULATION MODE
+              <Badge variant="outline" className="text-[10px] text-muted-foreground border-border/60 font-normal">
+                Simulation Mode
               </Badge>
             )}
           </div>
 
-          {/* Center: Bifrost Real-Time Telemetry Bar */}
-          <div className="flex flex-wrap items-center gap-4 bg-muted/50 rounded-md px-4 py-2 border border-border text-xs font-mono">
+          {/* Center: Real Assessment Telemetry */}
+          <div className="flex flex-wrap items-center gap-3 bg-muted/30 rounded-md px-3.5 py-1.5 border border-border/60 text-xs">
             <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Cpu className="h-3.5 w-3.5 text-primary" />
-              <span className="text-foreground font-semibold">Claude 3.5 Sonnet</span>
-              <Badge variant="outline" className="text-[9px] py-0 px-1">
-                Bifrost
-              </Badge>
+              <Shield className="h-3.5 w-3.5 text-muted-foreground/60" />
+              <span>Targets:</span>
+              <span className="text-foreground font-mono font-medium">{assetsCount}</span>
             </div>
 
-            <span className="text-border">|</span>
+            <span className="text-border/60">|</span>
 
             <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>Tokens:</span>
-              <span className="text-foreground font-semibold">{tokens.toLocaleString()}</span>
+              <Layers className="h-3.5 w-3.5 text-muted-foreground/60" />
+              <span>Services:</span>
+              <span className="text-foreground font-mono font-medium">{servicesCount}</span>
             </div>
 
-            <span className="text-border">|</span>
+            <span className="text-border/60">|</span>
 
             <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Clock className="h-3.5 w-3.5 text-primary" />
-              <span>Latency:</span>
-              <span className="text-foreground font-semibold">320ms</span>
-            </div>
-
-            <span className="text-border">|</span>
-
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <DollarSign className="h-3.5 w-3.5 text-primary" />
-              <span>Cost:</span>
-              <span className="text-foreground font-bold">{formatCurrency(cost)}</span>
+              <Clock className="h-3.5 w-3.5 text-muted-foreground/60" />
+              <span>Findings:</span>
+              <span className="text-foreground font-mono font-medium">{findingsCount}</span>
             </div>
           </div>
 
@@ -96,7 +105,7 @@ export function BifrostHUD({
                 size="sm"
                 onClick={onPause}
                 disabled={isActionLoading}
-                className="gap-1.5"
+                className="gap-1.5 text-xs h-7.5 px-2.5"
               >
                 <Pause className="h-3.5 w-3.5" />
                 <span>Pause</span>
@@ -105,10 +114,11 @@ export function BifrostHUD({
 
             {assessment.status === "PAUSED" && (
               <Button
+                variant="outline"
                 size="sm"
                 onClick={onResume}
                 disabled={isActionLoading}
-                className="gap-1.5"
+                className="gap-1.5 text-xs h-7.5 px-2.5"
               >
                 <Play className="h-3.5 w-3.5" />
                 <span>Resume</span>
@@ -121,24 +131,22 @@ export function BifrostHUD({
                 size="sm"
                 onClick={onCancel}
                 disabled={isActionLoading}
-                className="gap-1.5"
+                className="gap-1.5 text-xs h-7.5 px-2.5"
               >
                 <Square className="h-3.5 w-3.5 fill-current" />
                 <span>Abort</span>
               </Button>
             )}
 
-            {onDownloadPdf && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onDownloadPdf}
-                className="gap-1.5"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Export PDF</span>
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDownloadPdf}
+              className="gap-1.5 text-xs h-7.5 px-2.5"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span>PDF Report</span>
+            </Button>
           </div>
         </div>
       </CardContent>

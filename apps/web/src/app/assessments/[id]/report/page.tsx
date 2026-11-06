@@ -4,18 +4,15 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  FileText,
   Download,
   ExternalLink,
-  ShieldAlert,
-  CheckCircle,
   Copy,
   Check,
 } from "lucide-react";
 import { getAssessment, getReport } from "@/lib/api";
 import { AssessmentDetail } from "@/lib/types";
 import { getSeverityColor } from "@/lib/utils";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -61,9 +58,9 @@ export default function ReportDeliverablePage({ params }: PageProps) {
 
   if (isLoading || !assessment) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-        <p className="text-xs font-mono text-muted-foreground">Preparing Executive Report...</p>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-3">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+        <p className="text-xs text-muted-foreground">Preparing Executive Report...</p>
       </div>
     );
   }
@@ -75,14 +72,14 @@ export default function ReportDeliverablePage({ params }: PageProps) {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Navigation Breadcrumb */}
-      <div className="flex items-center justify-between text-xs font-mono">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2 text-muted-foreground">
           <Link href={`/assessments/${assessmentId}`} className="hover:text-foreground flex items-center gap-1 transition-colors">
             <ArrowLeft className="h-3 w-3" />
             Back to Assessment
           </Link>
           <span>/</span>
-          <span className="text-foreground">Executive Report Deliverables</span>
+          <span className="text-foreground font-medium">Executive Report</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -93,7 +90,7 @@ export default function ReportDeliverablePage({ params }: PageProps) {
             disabled={!reportMarkdown}
             className="text-xs gap-1.5"
           >
-            {hasCopied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
+            {hasCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 opacity-60" />}
             <span>{hasCopied ? "Copied" : "Copy Markdown"}</span>
           </Button>
 
@@ -119,114 +116,87 @@ export default function ReportDeliverablePage({ params }: PageProps) {
       </div>
 
       {/* Deliverable Document Card */}
-      <Card className="p-6 sm:p-10 space-y-8 font-sans">
+      <Card className="p-6 sm:p-8 space-y-8 border-border/80">
         {/* Report Header */}
-        <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="border-b border-border/60 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Badge variant="outline" className="font-mono text-xs">
-                ARGUS CISO DELIVERABLE
+            <div className="flex items-center gap-2 mb-1.5">
+              <Badge variant="outline" className="text-xs">
+                CISO Security Deliverable
               </Badge>
               {assessment.simulation && (
                 <Badge variant="outline" className="text-[10px]">
-                  SIMULATION AUDIT
+                  Simulation Audit
                 </Badge>
               )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              Penetration Test Report: {assessment.name || assessment.id}
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+              Security Assessment: {assessment.name || assessment.id}
             </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground font-mono mt-1">
+            <p className="text-xs text-muted-foreground mt-1 font-mono">
               Target: {assessment.target?.value} · Generated: {new Date().toLocaleDateString()}
             </p>
           </div>
 
-          <div className="flex items-center gap-4 bg-muted/30 border border-border p-4 rounded-lg shrink-0 font-mono">
+          <div className="flex items-center gap-4 bg-muted/40 border border-border p-3.5 rounded-lg shrink-0">
             <div className="text-center">
-              <div className="text-[10px] text-muted-foreground uppercase">Risk Score</div>
-              <div className="text-2xl font-bold text-destructive">
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Risk Score</div>
+              <div className="text-2xl font-mono font-bold text-destructive">
                 {criticalCount > 0 ? "9.8" : highCount > 0 ? "7.5" : "3.0"}
                 <span className="text-xs text-muted-foreground font-normal"> / 10</span>
               </div>
             </div>
-            <span className="text-border">|</span>
-            <div className="text-center">
-              <div className="text-[10px] text-muted-foreground uppercase">Confidence</div>
-              <div className="text-2xl font-bold text-primary">100%</div>
-            </div>
           </div>
         </div>
 
-        {/* Executive Summary */}
+        {/* Findings Summary Matrix */}
         <div className="space-y-3">
-          <h2 className="text-lg font-bold tracking-tight text-foreground">Executive Summary</h2>
-          <div className="rounded-lg border border-border bg-muted/20 p-5 text-sm text-foreground leading-relaxed font-sans">
-            ARGUS performed an autonomous, evidence-verified security assessment of target system{" "}
-            <strong>{assessment.target?.value}</strong>. All candidate actions were governed by deterministic policy bounds. A total of{" "}
-            <strong>{findings.length} confirmed security findings</strong> were identified and verified with zero LLM hallucination.
-          </div>
-        </div>
-
-        {/* Verified Findings */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-bold tracking-tight text-foreground">Verified Findings & Proof</h2>
-          {findings.length === 0 ? (
-            <div className="rounded-lg border border-border bg-muted/20 p-6 text-center text-xs font-mono text-muted-foreground">
-              No vulnerabilities confirmed during this assessment run.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {findings.map((f, i) => {
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Verified Vulnerability Summary
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {findings.length === 0 ? (
+              <div className="col-span-2 p-6 rounded-md border border-border bg-muted/20 text-center text-xs text-muted-foreground">
+                No vulnerabilities verified during this run.
+              </div>
+            ) : (
+              findings.map((f) => {
                 const sev = getSeverityColor(f.severity);
                 return (
-                  <div key={i} className={`rounded-lg border ${sev.border} p-5 space-y-3 bg-card`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${sev.badge}`}>
-                            {f.severity}
-                          </span>
-                          <h3 className="text-base font-bold text-foreground">{f.title}</h3>
-                        </div>
-                        <span className="font-mono text-xs text-muted-foreground">
-                          ID: {f.finding_id} · Asset: {f.affected_asset} · Service: {f.affected_service}
-                        </span>
-                      </div>
+                  <div
+                    key={f.finding_id}
+                    className={`p-3.5 rounded-md border ${sev.border} ${sev.bg} space-y-2`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${sev.badge}`}>
+                        {f.severity}
+                      </span>
+                      <span className="text-[11px] font-mono text-muted-foreground">{f.finding_id}</span>
                     </div>
-
-                    <p className="text-xs sm:text-sm text-foreground leading-relaxed">
+                    <div className="text-xs font-semibold text-foreground tracking-tight">
+                      {f.title}
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                       {f.description}
                     </p>
-
-                    {f.reproduction_steps && (
-                      <div className="rounded-md border border-border bg-muted/40 p-3 font-mono text-xs text-foreground">
-                        <div className="text-[10px] uppercase text-muted-foreground mb-1">
-                          Proof of Concept Command
-                        </div>
-                        <span className="text-primary font-bold">$ </span>
-                        {f.reproduction_steps}
-                      </div>
-                    )}
                   </div>
                 );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Cryptographic Chain of Custody */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-bold tracking-tight text-foreground">Evidence Chain of Custody</h2>
-          <div className="rounded-lg border border-border bg-muted/20 p-5 font-mono text-xs space-y-2 text-muted-foreground">
-            <div className="flex items-center justify-between text-foreground font-semibold">
-              <span>Cryptographic Tamper-Evident Ledger</span>
-              <Badge variant="success">Merkle Hash Chain Verified</Badge>
-            </div>
-            <p className="text-[11px] leading-relaxed">
-              Every tool output and raw payload collected during this assessment was hashed via SHA-256 and chained into the assessment evidence vault.
-            </p>
+              })
+            )}
           </div>
         </div>
+
+        {/* Markdown Narrative Body */}
+        {reportMarkdown && (
+          <div className="border-t border-border/60 pt-6 space-y-4">
+            <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Technical Narrative
+            </h2>
+            <div className="prose prose-sm dark:prose-invert max-w-none bg-muted/20 p-5 rounded-md border border-border text-xs leading-relaxed custom-scrollbar overflow-x-auto whitespace-pre-wrap font-mono">
+              {reportMarkdown}
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -1,21 +1,57 @@
+# Version control
 .git
 .gitignore
-.venv
-__pycache__
+
+# Python virtual environments & bytecode
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
 *.py[cod]
-.pytest_cache
-.mypy_cache
-.ruff_cache
-artifacts
-argus.db
-argus.db-*
+*$py.class
+*.so
+.Python
+
+# Testing & linting caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Database & runtime files
+*.db
+*.db-*
+*.sqlite3
 *.raw
+artifacts/
+
+# System files
 .DS_Store
-tasks
-tests
-docs
-specs
-node_modules
-**/node_modules
-.next
-**/.next
+Thumbs.db
+
+# Documentation & specs not needed for container images
+tasks/
+docs/
+specs/
+
+# Node.js dependencies & builds
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local environment overrides
+.env.local
+.env.*.local
+*.log

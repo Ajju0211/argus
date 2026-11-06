@@ -1,0 +1,40 @@
+# ARGUS — Production Docker Compose Configuration
+#
+# Usage:
+#   docker compose -f compose.prod.yaml up -d --build
+#
+# Features:
+#   - Optimized multi-stage production Docker images
+#   - FastAPI production execution without reload
+#   - Next.js standalone runner without node_modules overhead
+#   - Zero bind mounts of local host source code
+#   - Appropriate health checks, restart policies (always), and least-privilege non-root execution
+#   - Secure production logging and environment configurations
+
+include:
+  - compose.base.yaml
+
+services:
+  bifrost:
+    restart: always
+
+  mock-target-lab:
+    restart: always
+
+  argus-api:
+    build:
+      target: prod
+    restart: always
+    environment:
+      ARGUS_ENV: production
+      ARGUS_LOG_LEVEL: INFO
+    command: ["uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  argus-dashboard:
+    build:
+      target: runner
+    restart: always
+    environment:
+      NODE_ENV: production
+    command: ["node", "server.js"]
+

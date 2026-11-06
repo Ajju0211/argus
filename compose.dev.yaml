@@ -1,0 +1,52 @@
+# ARGUS — Development Docker Compose Configuration
+#
+# Usage:
+#   docker compose -f compose.dev.yaml up --build
+#
+# Features:
+#   - FastAPI auto-reload enabled (--reload) watching Python files
+#   - Next.js Fast Refresh / HMR enabled with watchpack polling
+#   - Bind mounts sync local host source code in real time
+#   - Named volumes isolate container node_modules & .next build cache
+#   - Persistent data volumes for SQLite database, evidence vault, and Bifrost
+#   - No rebuild or container restart required on code changes
+
+include:
+  - compose.base.yaml
+
+services:
+  argus-api:
+    build:
+      target: dev
+    environment:
+      ARGUS_ENV: development
+      ARGUS_LOG_LEVEL: DEBUG
+      PYTHONPATH: /app
+    command: ["uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app"]
+    volumes:
+      - ./core:/app/core
+      - ./engine:/app/engine
+      - ./integrations:/app/integrations
+      - ./packages:/app/packages
+      - ./apps:/app/apps
+      - ./tests:/app/tests
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - argus-data:/app/data
+      - argus-artifacts:/app/artifacts
+
+  argus-dashboard:
+    build:
+      target: dev
+    environment:
+      NODE_ENV: development
+      WATCHPACK_POLLING: "true"
+    command: ["npm", "run", "dev", "--", "-H", "0.0.0.0"]
+    volumes:
+      - ./apps/web:/app
+      - argus-web-node-modules:/app/node_modules
+      - argus-web-next:/app/.next
+
+volumes:
+  argus-web-node-modules:
+  argus-web-next:
+

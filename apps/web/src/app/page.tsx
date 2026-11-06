@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PlusCircle, ShieldAlert, RefreshCw, Terminal, Activity } from "lucide-react";
+import { PlusCircle, ShieldAlert, RefreshCw } from "lucide-react";
 import { KpiCardGrid } from "@/components/dashboard/KpiCardGrid";
 import { AssessmentsTable } from "@/components/dashboard/AssessmentsTable";
 import { AssessmentDetail } from "@/lib/types";
 import { listAssessments } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 
 export default function DashboardPage() {
   const [assessments, setAssessments] = useState<AssessmentDetail[]>([]);
@@ -41,69 +40,55 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Executive Command Header */}
-      <Card className="border-border bg-card/80">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Badge variant="success" className="font-mono text-[11px] gap-1.5">
-                  <Activity className="h-3 w-3 animate-pulse" />
-                  Autonomous ReAct Agent Orchestrator Active
-                </Badge>
-                <Badge variant="outline" className="font-mono text-[11px]">
-                  Bifrost OSS Gateway
-                </Badge>
-              </div>
-              <h1 className="text-xl sm:text-2xl font-mono font-bold tracking-tight text-foreground">
-                Security Operations Command Center
-              </h1>
-              <p className="max-w-2xl text-xs font-mono text-muted-foreground">
-                Zero-hallucination penetration testing console. Every vulnerability is backed by
-                verifiable HTTP proof and recorded in a cryptographic Merkle hash chain.
-              </p>
-            </div>
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+            Command Center
+          </h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            Autonomous security testing operations verified by cryptographic evidence.
+          </p>
+        </div>
 
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => loadAssessments(false)}
-                disabled={isRefreshing}
-                className="gap-1.5"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-                <span>Refresh</span>
-              </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadAssessments(false)}
+            disabled={isRefreshing}
+            className="gap-1.5 text-xs"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </Button>
 
-              <Link href="/new">
-                <Button size="sm" className="gap-1.5">
-                  <PlusCircle className="h-4 w-4" />
-                  <span>Launch Assessment</span>
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          <Link href="/new">
+            <Button size="sm" className="gap-1.5 text-xs">
+              <PlusCircle className="h-3.5 w-3.5" />
+              <span>Launch Assessment</span>
+            </Button>
+          </Link>
+        </div>
+      </div>
 
       {/* Error Alert */}
       {error && (
-        <Card className="border-destructive/40 bg-destructive/10 text-destructive">
-          <CardContent className="p-4 flex items-center gap-3 text-xs font-mono">
-            <ShieldAlert className="h-5 w-5 shrink-0" />
+        <Card className="border-destructive/30 bg-destructive/10 text-destructive">
+          <CardContent className="p-3.5 flex items-center gap-2.5 text-xs font-mono">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
             <span>
               {error} Please ensure the backend is running at{" "}
-              <code className="font-bold underline">http://localhost:8000</code>.
+              <code className="font-semibold underline">http://localhost:8000</code>.
             </span>
           </CardContent>
         </Card>
       )}
 
-      {/* Domain KPI Cards */}
+      {/* KPI Stats Grid */}
       <KpiCardGrid assessments={assessments} />
 
-      {/* Historical Assessments Domain View */}
+      {/* Historical Runs Table */}
       <AssessmentsTable assessments={assessments} />
     </div>
   );

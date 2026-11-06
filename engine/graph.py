@@ -14,6 +14,7 @@ import shutil
 import socket
 import urllib.parse
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, cast
 
 import httpx
@@ -507,6 +508,19 @@ class AssessmentOrchestrator:
         )
         evidence_id = artifact.evidence_id
 
+        self._append_ledger_record(
+            state=state,
+            tool=tool_name,
+            target_host=clean_host,
+            target_port=recon_proposal.target_port,
+            arguments=recon_args,
+            exit_code=retcode,
+            stdout_raw=raw_content,
+            stderr_raw=stderr,
+            evidence_id=evidence_id,
+            action_id=recon_proposal.action_id,
+        )
+
         # Parse observations from actual tool output
         adapter = self.tool_registry.get(tool_name)
         parsed_observations = (
@@ -750,6 +764,44 @@ class AssessmentOrchestrator:
             }
         return {"resolved_ip": decision.resolved_ip}
 
+    def _append_ledger_record(
+        self,
+        state: AssessmentState,
+        tool: str,
+        target_host: str,
+        target_port: int | None,
+        arguments: Any,
+        exit_code: int,
+        stdout_raw: str,
+        stderr_raw: str,
+        evidence_id: str,
+        action_id: str = "",
+    ) -> None:
+        """Appends a T2 executor-attested record to the Merkle ledger if enabled."""
+        if not get_settings().ENABLE_PROOF_LEDGER:
+            return
+        try:
+            from core.evidence.ledger import AssessmentLedger
+            ledger_path = Path(self.evidence_vault.base_dir) / state["assessment_id"] / "ledger.jsonl"
+            ledger = AssessmentLedger(ledger_path, assessment_id=state["assessment_id"])
+            ledger.append_record(
+                event="tool_result",
+                tool=tool,
+                target_host=target_host,
+                target_port=target_port,
+                arguments=arguments,
+                exit_code=exit_code,
+                stdout_raw=stdout_raw,
+                stderr_raw=stderr_raw,
+                evidence_ids=[evidence_id],
+                tier="T2",
+                action_id=action_id,
+                bifrost_metadata=state.get("bifrost_telemetry"),
+                research_metadata=state.get("research_refs"),
+            )
+        except Exception:
+            pass
+
     def execute_tool_node(self, state: AssessmentState) -> dict[str, Any]:
         """Executes the approved tool proposal via the injected tool executor."""
         action_dict = state["current_action"]
@@ -793,6 +845,19 @@ class AssessmentOrchestrator:
             metadata={"action_id": proposal.action_id, "retcode": retcode},
         )
         evidence_id = artifact.evidence_id
+
+        self._append_ledger_record(
+            state=state,
+            tool=proposal.tool_name,
+            target_host=proposal.target_host,
+            target_port=proposal.target_port,
+            arguments=proposal.arguments,
+            exit_code=retcode,
+            stdout_raw=raw_content,
+            stderr_raw=stderr,
+            evidence_id=evidence_id,
+            action_id=proposal.action_id,
+        )
 
         if retcode != 0:
             failure_type = classify_error(retcode, stderr or stdout)
@@ -944,12 +1009,46 @@ class AssessmentOrchestrator:
                 initial_evidence_id=discovery_evidence_id or ev_id,
             )
 
+            # Spec 11 Chain of Custody: Lookup inclusion proof and enforce T2 attestation
+            proof_id = None
+            ledger_root = None
+            proof_summary = None
+
+            if get_settings().ENABLE_PROOF_LEDGER:
+                from core.evidence.ledger import AssessmentLedger
+                ledger_path = Path(self.evidence_vault.base_dir) / state["assessment_id"] / "ledger.jsonl"
+                if ledger_path.exists():
+                    try:
+                        ledger = AssessmentLedger(ledger_path, assessment_id=state["assessment_id"])
+                        proof_obj = ledger.get_proof_for_evidence_id(ev_id)
+                        if proof_obj:
+                            rec = proof_obj.get("record", {})
+                            if rec.get("tier") != "T2":
+                                # T1 claims cannot confirm a finding (Spec 11 §6.1)
+                                continue
+                            head = ledger.head()
+                            ledger_root = head.get("root_hash")
+                            proof_id = f"proof-{state['assessment_id']}-{ev_id}"
+                            proof_summary = {
+                                "proof_id": proof_id,
+                                "ledger_root": ledger_root,
+                                "leaf_index": proof_obj.get("leaf_index"),
+                                "tree_size": proof_obj.get("tree_size"),
+                                "audit_path": proof_obj.get("audit_path"),
+                                "tier": "T2",
+                            }
+                    except Exception:
+                        pass
+
             confirmed_finding = self.finding_verifier.confirm_finding(
                 finding=potential_finding,
                 verification_evidence_id=ev_id,
                 verification_method=f"Automated probe verification via {obs.get('tool')}",
                 reproduction_steps=repro,
                 impact=f"Confirmed security flaw on {affected_asset}",
+                proof_id=proof_id,
+                ledger_root=ledger_root,
+                proof_summary=proof_summary,
             )
 
             new_findings.append(confirmed_finding.model_dump(mode="json"))

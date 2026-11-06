@@ -604,6 +604,41 @@ class ReportGenerator:
                 )
         else:
             lines.append("No Bifrost telemetry was captured for this run.")
+
+        # Spec 11: Chain of Custody & Merkle Proof Capsules
+        findings_with_proof = [
+            f for f in state.get("findings", []) if isinstance(f, dict) and f.get("proof_id")
+        ]
+        lines.extend(["", "### Chain of Custody & Proof Capsules", ""])
+        if findings_with_proof:
+            lines.extend(
+                [
+                    "| Finding ID | Title | Proof Capsule ID | Ledger Root | Attestation |",
+                    "|---|---|---|---|---|",
+                ]
+            )
+            for f in findings_with_proof:
+                lines.append(
+                    "| "
+                    + " | ".join(
+                        [
+                            f"`{_cell(f.get('finding_id'))}`",
+                            _cell(f.get("title")),
+                            f"`{_cell(f.get('proof_id'))}`",
+                            f"`{_cell(f.get('ledger_root') or 'unknown')[:18]}...`",
+                            "**T2 (Executor)**",
+                        ]
+                    )
+                    + " |"
+                )
+            lines.append("")
+            lines.append("To independently verify proof capsules offline without trusting the AI:")
+            lines.append("```bash")
+            lines.append("python scripts/verify_proof.py <path-to-capsule.argusproof>")
+            lines.append("```")
+        else:
+            lines.append("No cryptographic proof capsules were bound to findings in this run.")
+
         lines.append("")
         return lines
 

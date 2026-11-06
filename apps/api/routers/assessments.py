@@ -1,6 +1,7 @@
 """Assessment lifecycle, SSE telemetry, cancellation, checkpoints, and report endpoints (Spec 06)."""
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -561,4 +562,95 @@ def download_report_pdf(assessment_id: str, request: Request) -> FileResponse:
 
     return FileResponse(
         candidate, media_type="application/pdf", filename=f"{assessment_id}-report.pdf"
+    )
+
+
+@router.get("/{assessment_id}/proof")
+def download_proof_capsule(
+    assessment_id: str,
+    request: Request,
+    finding_id: str = "",
+) -> FileResponse:
+    """Generates and downloads a self-contained .argusproof Proof Capsule (Spec 11)."""
+    record = request.app.state.db.get(assessment_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+
+    artifacts_dir = Path(request.app.state.artifacts_dir).resolve()
+    assessment_artifacts_dir = artifacts_dir / assessment_id
+
+    # Find the finding
+    findings = record.get("findings", [])
+    target_finding = None
+    if finding_id:
+        for f in findings:
+            if f.get("finding_id") == finding_id:
+                target_finding = f
+                break
+        if target_finding is None:
+            raise HTTPException(status_code=404, detail=f"Finding '{finding_id}' not found")
+    elif findings:
+        target_finding = findings[0]
+    else:
+        raise HTTPException(status_code=404, detail="No findings available to generate proof for")
+
+    # Load ledger
+    from core.evidence.ledger import AssessmentLedger
+    from core.evidence.proof_capsule import ProofCapsuleBuilder
+
+    ledger_path = assessment_artifacts_dir / "ledger.jsonl"
+    if not ledger_path.exists():
+        raise HTTPException(status_code=404, detail="Ledger not found for this assessment")
+
+    ledger = AssessmentLedger(ledger_path, assessment_id=assessment_id)
+    head = ledger.head()
+    records = ledger.records()
+
+    # Collect proofs and artifacts for this finding
+    proofs = []
+    artifacts = []
+    for ev_id in target_finding.get("evidence_ids", []):
+        proof_obj = ledger.get_proof_for_evidence_id(ev_id)
+        if proof_obj:
+            proofs.append(
+                {
+                    "evidence_id": ev_id,
+                    "leaf_index": proof_obj["leaf_index"],
+                    "tree_size": proof_obj["tree_size"],
+                    "audit_path": proof_obj["audit_path"],
+                }
+            )
+        art_path = assessment_artifacts_dir / f"{ev_id}.raw"
+        if art_path.exists():
+            content = art_path.read_text(encoding="utf-8")
+            sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            artifacts.append(
+                {
+                    "evidence_id": ev_id,
+                    "content": content,
+                    "sha256": f"sha256:{sha256}",
+                }
+            )
+
+    fid = target_finding.get("finding_id", "F-001")
+    capsule_filename = f"{assessment_id}-{fid}.argusproof"
+    capsule_path = assessment_artifacts_dir / capsule_filename
+
+    builder = ProofCapsuleBuilder(
+        assessment_id=assessment_id,
+        finding=target_finding,
+        ledger_head=head,
+        proofs=proofs,
+        artifacts=artifacts,
+        ledger_records=records,
+        bifrost_telemetry=record.get("bifrost_telemetry"),
+        research_citations=record.get("research_sources"),
+        simulation=record.get("simulation_mode", False),
+    )
+    builder.write_capsule_zip(capsule_path)
+
+    return FileResponse(
+        capsule_path,
+        media_type="application/zip",
+        filename=capsule_filename,
     )

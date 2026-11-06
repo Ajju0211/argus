@@ -138,23 +138,86 @@ This checklist tracks concrete, implementable engineering tasks. Each task speci
 ---
 
 ### Module 07: Next.js Dashboard & Header
-- [ ] **Task 07.1: Next.js 15 App Scaffolding with Tailwind & Radix UI**
+- [x] **Task 07.1: Next.js 15 App Scaffolding with Tailwind & Radix UI**
   - Acceptance: Next.js 15 App Router project set up under `apps/web/` with dark mode theme.
-  - Verify: `cd apps/web && pnpm build`
+  - Verify: `cd apps/web && npm run build`
   - Files: `apps/web/package.json`, `apps/web/src/app/layout.tsx`
 
-- [ ] **Task 07.2: Application Header & Bifrost Telemetry Bar**
+- [x] **Task 07.2: Application Header & Bifrost Telemetry Bar**
   - Acceptance: Sticky header displaying target badge, timer, active Bifrost model, token usage, latency, and cost indicator.
   - Verify: Visual inspection and component unit test.
-  - Files: `apps/web/src/components/Header.tsx`, `apps/web/src/components/BifrostTelemetryBar.tsx`
+  - Files: `apps/web/src/components/layout/AppHeader.tsx`, `apps/web/src/components/navigation/BifrostHUD.tsx`
 
-- [ ] **Task 07.3: Live Assessment Room UI with SSE Stream**
+- [x] **Task 07.3: Live Assessment Room UI with SSE Stream**
   - Acceptance: Split screen with real-time audit timeline on the left and topology/findings board on the right.
   - Verify: End-to-end event stream display.
-  - Files: `apps/web/src/app/assessments/[id]/page.tsx`, `apps/web/src/components/AuditTimeline.tsx`
+  - Files: `apps/web/src/app/assessments/[id]/page.tsx`, `apps/web/src/components/live/AuditTimeline.tsx`
 
-- [ ] **Task 07.4: Client-Ready PDF Report Generator**
+- [x] **Task 07.4: Client-Ready PDF Report Generator**
   - Acceptance: Executive PDF report with topology diagram, findings matrix, SHA-256 evidence digests, and Tavily remediation citations.
   - Verify: `curl http://localhost:8000/api/v1/assessments/{id}/report/pdf -o report.pdf`
-  - Files: `core/reporting/pdf_generator.py`
+  - Files: `core/reporting/report_generator.py`, `core/reporting/pdf_exporter.py`
+
+---
+
+### Module 08: Testing, Evaluation & Lab Setups
+- [x] **Task 08.1: 15 Mandatory Scenario Test Suite Verification**
+  - Acceptance: 15 automated test cases passing 100% covering security, failure recovery, failover, and evidence integrity.
+  - Verify: `.venv/bin/pytest tests/integration/test_scenarios.py -v` (15/15 passed)
+  - Files: `tests/integration/test_scenarios.py`, `specs/08-testing-evaluation-and-labs.md`
+
+- [x] **Task 08.2: Pre-Configured Test Lab A (Vulnerable Web App)**
+  - Acceptance: Standardized Dockerized Apache 2.4.49 path traversal target (`CVE-2021-41773`) with scope fixture and verification probe.
+  - Verify: `.venv/bin/pytest tests/integration/test_e2e_lab.py -v`
+  - Files: `infrastructure/labs/lab-a-web/Dockerfile`, `infrastructure/labs/lab-a-web/server.py`, `infrastructure/labs/lab-a-web/scope.yaml`
+
+- [x] **Task 08.3: Pre-Configured Test Lab B (Multi-Service Linux Host)**
+  - Acceptance: Standardized multi-service target exposing FTP (`vsftpd 2.3.4`) and SSH (`OpenSSH 8.4p1`) with automated multi-port recon.
+  - Verify: `.venv/bin/pytest tests/integration/test_lab_b_network.py -v`
+  - Files: `infrastructure/labs/lab-b-network/Dockerfile`, `infrastructure/labs/lab-b-network/server.py`, `infrastructure/labs/lab-b-network/scope.yaml`
+
+- [x] **Task 08.4: M1 Resource Budget & 10 MB Artifact Quota**
+  - Acceptance: Strict per-file 10 MB evidence disk quota with clean truncation banner and cryptographic integrity preserved.
+  - Verify: `.venv/bin/pytest tests/unit/test_evidence_quota.py -v`
+  - Files: `core/evidence/evidence_vault.py`, `tests/unit/test_evidence_quota.py`
+
+- [x] **Task 08.5: Full Suite Coverage Enforcement (80%+ Gate)**
+  - Acceptance: 100% passing test suite across all modules with >80% total code coverage.
+  - Verify: `.venv/bin/pytest tests --cov=core --cov=engine --cov=integrations` (256 passed, 87% coverage)
+  - Files: `pyproject.toml`, `tests/`
+
+---
+
+### Module 11: Proof-Carrying Findings & Chain of Custody
+- [x] **Task 11.1: Cryptographic Merkle Log Primitive**
+  - Acceptance: Canonical JSON serialization, domain-separated leaf (`\x00`) and node (`\x01`) SHA-256 hashing, pairwise tree construction with odd-node promotion, and RFC-style inclusion proofs.
+  - Verify: `.venv/bin/pytest tests/unit/test_merkle_log.py -v` (16/16 passed)
+  - Files: `core/evidence/merkle_log.py`, `tests/unit/test_merkle_log.py`
+
+- [x] **Task 11.2: Append-Only Assessment Ledger with T2 Attestation**
+  - Acceptance: JSONL append-only log with strict monotonic sequence numbering, T2 executor attestation, and tree head tracking.
+  - Verify: `.venv/bin/pytest tests/unit/test_ledger.py -v` (2/2 passed)
+  - Files: `core/evidence/ledger.py`, `tests/unit/test_ledger.py`
+
+- [x] **Task 11.3: Proof Capsule (.argusproof) Packaging & Security Hardening**
+  - Acceptance: Self-contained ZIP bundle with `manifest.json`, `ledger.jsonl`, and redacted artifacts. Enforces zip-bomb ceilings (50MB) and path traversal protection.
+  - Verify: `.venv/bin/pytest tests/unit/test_proof_capsule.py -v` (6/6 passed)
+  - Files: `core/evidence/proof_capsule.py`, `tests/unit/test_proof_capsule.py`
+
+- [x] **Task 11.4: Standalone Offline Verifier (`scripts/verify_proof.py`)**
+  - Acceptance: Dependency-free, Python stdlib-only verification CLI validating Merkle roots, inclusion proofs, artifact hashes, and T2 attestation without trusting the agent.
+  - Verify: `python scripts/verify_proof.py <capsule.argusproof>` returns `PROVEN`
+  - Files: `scripts/verify_proof.py`
+
+- [x] **Task 11.5: Orchestrator Integration & Zero-Hallucination Proof Binding**
+  - Acceptance: Executor records T2 events into ledger on tool completion; finding verifier binds proof IDs and ledger roots to confirmed findings and rejects T1-only claims.
+  - Verify: `tests/integration/test_scenarios.py` (15/15 passed)
+  - Files: `engine/graph.py`, `packages/contracts/findings.py`, `core/findings/finding_verifier.py`
+
+- [x] **Task 11.6: FastAPI Capsule Download & Verification Endpoints**
+  - Acceptance: REST endpoints `GET /api/v1/assessments/{id}/proof` and `POST /api/v1/proof/verify`.
+  - Verify: `.venv/bin/pytest tests/integration/test_proof_api.py -v`
+  - Files: `apps/api/routers/assessments.py`, `apps/api/main.py`, `tests/integration/test_proof_api.py`
+
+
 

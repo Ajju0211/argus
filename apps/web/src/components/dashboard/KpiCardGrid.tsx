@@ -1,4 +1,4 @@
-import { ShieldCheck, Target, Bug, Cpu } from "lucide-react";
+import { ShieldCheck, Target, Bug, Lock } from "lucide-react";
 import { AssessmentDetail } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,44 +28,48 @@ export function KpiCardGrid({ assessments }: KpiCardGridProps) {
   const highCount = allFindings.filter((f) => f.severity === "HIGH").length;
   const otherCount = allFindings.length - criticalCount - highCount;
 
-  const totalTokens = assessments.reduce(
-    (acc, a) => acc + (a.budget?.tokens_consumed || 1640),
+  const totalEvidence = assessments.reduce(
+    (acc, a) => acc + (a.evidence_refs?.length || 0),
     0
   );
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
       {/* KPI 1: Assessments */}
-      <Card className="hover:border-primary/40 transition-colors">
-        <CardContent className="p-5">
+      <Card className="hover:border-border transition-colors">
+        <CardContent className="p-4 sm:p-5">
           <div className="flex items-center justify-between text-muted-foreground mb-3">
-            <span className="text-xs font-mono uppercase tracking-wider">Assessments</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary border border-primary/20">
-              <ShieldCheck className="h-4 w-4" />
-            </div>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              Assessments
+            </span>
+            <ShieldCheck className="h-4 w-4 text-muted-foreground/50" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-mono font-bold text-foreground">{totalRuns}</span>
-            <Badge variant="success">
+            <span className="text-2xl sm:text-3xl font-mono font-semibold text-foreground">
+              {totalRuns}
+            </span>
+            <Badge variant="secondary" className="font-normal text-[10px]">
               {successRate}% Success
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">Autonomous LangGraph runs</p>
+          <p className="text-xs text-muted-foreground mt-2">Autonomous pentest runs</p>
         </CardContent>
       </Card>
 
       {/* KPI 2: Attack Surface */}
-      <Card className="hover:border-primary/40 transition-colors">
-        <CardContent className="p-5">
+      <Card className="hover:border-border transition-colors">
+        <CardContent className="p-4 sm:p-5">
           <div className="flex items-center justify-between text-muted-foreground mb-3">
-            <span className="text-xs font-mono uppercase tracking-wider">Attack Surface</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-foreground border border-border">
-              <Target className="h-4 w-4" />
-            </div>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              Attack Surface
+            </span>
+            <Target className="h-4 w-4 text-muted-foreground/50" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-mono font-bold text-foreground">{totalAssets}</span>
-            <Badge variant="outline">
+            <span className="text-2xl sm:text-3xl font-mono font-semibold text-foreground">
+              {totalAssets}
+            </span>
+            <Badge variant="outline" className="font-normal text-[10px]">
               {totalServices} Services
             </Badge>
           </div>
@@ -74,48 +78,54 @@ export function KpiCardGrid({ assessments }: KpiCardGridProps) {
       </Card>
 
       {/* KPI 3: Vulnerabilities */}
-      <Card className="hover:border-destructive/40 transition-colors">
-        <CardContent className="p-5">
+      <Card className="hover:border-border transition-colors">
+        <CardContent className="p-4 sm:p-5">
           <div className="flex items-center justify-between text-muted-foreground mb-3">
-            <span className="text-xs font-mono uppercase tracking-wider">Verified Findings</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-destructive/10 text-destructive border border-destructive/20">
-              <Bug className="h-4 w-4" />
-            </div>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              Verified Findings
+            </span>
+            <Bug className="h-4 w-4 text-muted-foreground/50" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-mono font-bold text-foreground">{allFindings.length}</span>
-            <Badge variant="destructive">
-              {criticalCount} Critical
-            </Badge>
+            <span className="text-2xl sm:text-3xl font-mono font-semibold text-foreground">
+              {allFindings.length}
+            </span>
+            {criticalCount > 0 ? (
+              <Badge variant="destructive" className="font-medium text-[10px]">
+                {criticalCount} Critical
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="font-normal text-[10px]">
+                {highCount} High
+              </Badge>
+            )}
           </div>
-          <div className="flex items-center gap-2 mt-2 font-mono text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
             <span>{highCount} High</span>
             <span>·</span>
             <span>{otherCount} Other</span>
-            <span>·</span>
-            <span className="text-primary font-semibold">100% Cryptographic Proof</span>
           </div>
         </CardContent>
       </Card>
 
-      {/* KPI 4: Bifrost Gateway Efficiency */}
-      <Card className="hover:border-primary/40 transition-colors">
-        <CardContent className="p-5">
+      {/* KPI 4: Evidence Vault & Merkle Audit Trail */}
+      <Card className="hover:border-border transition-colors">
+        <CardContent className="p-4 sm:p-5">
           <div className="flex items-center justify-between text-muted-foreground mb-3">
-            <span className="text-xs font-mono uppercase tracking-wider">Bifrost Gateway</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary border border-primary/20">
-              <Cpu className="h-4 w-4" />
-            </div>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              Evidence Vault
+            </span>
+            <Lock className="h-4 w-4 text-muted-foreground/50" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-mono font-bold text-foreground">
-              {totalTokens.toLocaleString()}
+            <span className="text-2xl sm:text-3xl font-mono font-semibold text-foreground">
+              {totalEvidence}
             </span>
-            <Badge variant="success">
-              Active
+            <Badge variant="secondary" className="font-normal text-[10px]">
+              Merkle Tree
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">Tokens routed via port 8080</p>
+          <p className="text-xs text-muted-foreground mt-2">Cryptographic SHA-256 chain</p>
         </CardContent>
       </Card>
     </div>

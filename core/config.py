@@ -133,6 +133,10 @@ class Settings(BaseSettings):
     STRICT_SCOPE_ENFORCEMENT: bool = Field(
         default=True, description="Feature flag: Mandatory deterministic pre-execution scope checks"
     )
+    ENABLE_PROOF_LEDGER: bool = Field(
+        default=True,
+        description="Feature flag: Record executed actions in append-only Merkle ledger and enforce T2 inclusion proofs",
+    )
 
 
 @lru_cache(maxsize=1)

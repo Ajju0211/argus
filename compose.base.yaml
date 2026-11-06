@@ -1,0 +1,114 @@
+# ARGUS — Shared Base Docker Compose Configuration
+#
+# Contains infrastructure services (Bifrost AI Gateway, Mock Target Lab),
+# base network definitions, persistence volumes, and common environment contracts.
+# Extended by compose.dev.yaml and compose.prod.yaml.
+
+name: argus
+
+services:
+  # Self-Hosted Open-Source Bifrost AI Gateway (maximhq/bifrost)
+  # Provides unified LLM routing, automatic provider failover, and live Web UI dashboard.
+  bifrost:
+    image: maximhq/bifrost:latest
+    container_name: argus-bifrost
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_PORT=8080
+      - APP_HOST=0.0.0.0
+      - BIFROST_SETUP_TOKEN=${BIFROST_SETUP_TOKEN:-argus-admin-token-2026}
+      # Bring-Your-Own LLM Provider Keys forwarded into self-hosted Bifrost
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+    volumes:
+      - bifrost-data:/app/data
+    networks:
+      - argus-lab
+    security_opt:
+      - no-new-privileges:true
+
+  # Authorized mock target lab for local testing
+  mock-target-lab:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/lab/Dockerfile
+    container_name: argus-mock-target-lab
+    restart: unless-stopped
+    ports:
+      - "8888:8080"
+    networks:
+      - argus-lab
+    security_opt:
+      - no-new-privileges:true
+
+  # FastAPI assessment orchestrator
+  argus-api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    container_name: argus-api
+    restart: unless-stopped
+    environment:
+      ARGUS_ENV: ${ARGUS_ENV:-production}
+      ARGUS_LOG_LEVEL: ${ARGUS_LOG_LEVEL:-INFO}
+      ARGUS_SIMULATION_MODE: ${ARGUS_SIMULATION_MODE:-true}
+      ARGUS_ARTIFACTS_DIR: /app/artifacts
+      ARGUS_DB_PATH: /app/data/argus.db
+      ARGUS_CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000"]'
+      ARGUS_BIFROST_API_KEY: ${ARGUS_BIFROST_API_KEY:-sk-bf-local}
+      ARGUS_BIFROST_ADMIN_USERNAME: ${BIFROST_ADMIN_USERNAME:-${ARGUS_BIFROST_ADMIN_USERNAME:-}}
+      ARGUS_BIFROST_ADMIN_PASSWORD: ${BIFROST_ADMIN_PASSWORD:-${ARGUS_BIFROST_ADMIN_PASSWORD:-}}
+      ARGUS_BIFROST_BASE_URL: ${ARGUS_DOCKER_BIFROST_BASE_URL:-http://bifrost:8080/v1}
+      ARGUS_BIFROST_PRIMARY_MODEL: ${ARGUS_BIFROST_PRIMARY_MODEL:-claude-3-5-sonnet-20241022}
+      ARGUS_BIFROST_FALLBACK_MODEL: ${ARGUS_BIFROST_FALLBACK_MODEL:-gpt-4o}
+      ARGUS_TAVILY_API_KEY: ${ARGUS_TAVILY_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - argus-data:/app/data
+      - argus-artifacts:/app/artifacts
+    ports:
+      - "8000:8000"
+    depends_on:
+      mock-target-lab:
+        condition: service_healthy
+      bifrost:
+        condition: service_started
+    networks:
+      - argus-lab
+    security_opt:
+      - no-new-privileges:true
+
+  # Next.js Cyber Command Dashboard
+  argus-dashboard:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/web.Dockerfile
+    container_name: argus-dashboard
+    restart: unless-stopped
+    environment:
+      API_URL: http://argus-api:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      argus-api:
+        condition: service_healthy
+    networks:
+      - argus-lab
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  argus-lab:
+    driver: bridge
+
+volumes:
+  argus-data:
+  argus-artifacts:
+  bifrost-data:
+

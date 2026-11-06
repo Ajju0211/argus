@@ -4,8 +4,6 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ShieldCheck,
-  ShieldAlert,
   ArrowLeft,
   Rocket,
   CheckCircle2,
@@ -71,14 +69,13 @@ export default function NewAssessmentPage() {
       }
       const lines = scopeYaml.split("\n");
       const hasTargets = lines.some((l) => l.trim().startsWith("allowed_hosts:"));
-      const hasPorts = lines.some((l) => l.trim().startsWith("allowed_ports:"));
 
       if (!hasTargets) {
         return { valid: false, message: "Scope must define 'allowed_hosts'" };
       }
       return {
         valid: true,
-        message: "Scope Validated: Host boundaries and port limits verified.",
+        message: "Scope Validated: Host boundaries verified.",
       };
     } catch (err: any) {
       return { valid: false, message: `Syntax error: ${err.message}` };
@@ -118,18 +115,18 @@ export default function NewAssessmentPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Top Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Link href="/" className="hover:text-foreground flex items-center gap-1 transition-colors">
           <ArrowLeft className="h-3 w-3" />
           Command Center
         </Link>
         <span>/</span>
-        <span className="text-foreground">New Assessment</span>
+        <span className="text-foreground font-medium">New Assessment</span>
       </div>
 
-      <Card>
+      <Card className="border-border/70">
         <CardHeader>
-          <CardTitle className="text-xl">Launch Authorized Assessment</CardTitle>
+          <CardTitle className="text-base sm:text-lg">Launch Authorized Assessment</CardTitle>
           <CardDescription>
             Configure target boundaries and policy-approved scope. All execution passes through the deterministic safety firewall.
           </CardDescription>
@@ -137,9 +134,9 @@ export default function NewAssessmentPage() {
 
         <CardContent className="space-y-6">
           {/* Quick Presets */}
-          <div className="rounded-lg border border-border bg-muted/40 p-4">
-            <div className="flex items-center gap-2 text-xs font-mono font-bold text-foreground mb-2">
-              <Zap className="h-4 w-4 text-primary" />
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
+            <div className="flex items-center gap-2 text-xs font-medium text-foreground mb-2.5">
+              <Zap className="h-3.5 w-3.5 text-muted-foreground/70" />
               Demo Quick Presets
             </div>
             <div className="flex flex-wrap gap-2">
@@ -171,35 +168,37 @@ export default function NewAssessmentPage() {
           </div>
 
           {submitError && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs font-mono text-destructive flex items-center gap-2.5">
+            <div className="rounded-md border border-rose-500/25 bg-rose-500/5 p-3 text-xs font-mono text-rose-500 dark:text-rose-400 flex items-center gap-2.5">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span>{submitError}</span>
             </div>
           )}
 
-          <form onSubmit={handleLaunch} className="space-y-6">
+          <form onSubmit={handleLaunch} className="space-y-5">
             {/* Target Info */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                <label className="block text-xs font-medium text-muted-foreground">
                   Assessment Name
                 </label>
                 <Input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  className="font-sans border-border/70"
                   required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                <label className="block text-xs font-medium text-muted-foreground">
                   Target URL / IP Address
                 </label>
                 <Input
                   type="text"
                   value={target}
                   onChange={(e) => setTarget(e.target.value)}
+                  className="font-mono text-xs border-border/70"
                   required
                 />
               </div>
@@ -208,16 +207,16 @@ export default function NewAssessmentPage() {
             {/* Scope YAML Editor & Live Validation */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                <label className="text-xs font-medium text-muted-foreground">
                   Authorized Scope Document (YAML)
                 </label>
-                <Badge variant={scopeValidation.valid ? "success" : "destructive"}>
+                <Badge variant={scopeValidation.valid ? "secondary" : "destructive"}>
                   {scopeValidation.valid ? (
-                    <CheckCircle2 className="h-3 w-3" />
+                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
                   ) : (
-                    <AlertCircle className="h-3 w-3" />
+                    <AlertCircle className="h-3 w-3 text-rose-500" />
                   )}
-                  <span>{scopeValidation.message}</span>
+                  <span className="text-[10px]">{scopeValidation.message}</span>
                 </Badge>
               </div>
 
@@ -226,20 +225,20 @@ export default function NewAssessmentPage() {
                 value={scopeYaml}
                 onChange={(e) => setScopeYaml(e.target.value)}
                 required
-                className="w-full rounded-md border border-input bg-muted/20 p-3 font-mono text-xs text-foreground focus:border-primary focus:outline-none"
+                className="w-full rounded-md border border-border/70 bg-muted/20 p-3 font-mono text-xs text-foreground focus:border-border focus:outline-none custom-scrollbar"
               />
             </div>
 
             {/* Execution Strategy */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                <label className="block text-xs font-medium text-muted-foreground">
                   Objective Strategy
                 </label>
                 <select
                   value={objective}
                   onChange={(e) => setObjective(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs font-mono text-foreground focus:border-primary focus:outline-none"
+                  className="w-full h-8 rounded-md border border-border/70 bg-card px-2.5 text-xs text-foreground focus:border-border focus:outline-none"
                 >
                   <option value="find_cve">Find & Verify Vulnerabilities</option>
                   <option value="discover_services">Reconnaissance & Ports Only</option>
@@ -248,8 +247,8 @@ export default function NewAssessmentPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                  Max ReAct Iterations
+                <label className="block text-xs font-medium text-muted-foreground">
+                  Max Iterations
                 </label>
                 <Input
                   type="number"
@@ -257,35 +256,36 @@ export default function NewAssessmentPage() {
                   max={30}
                   value={maxIterations}
                   onChange={(e) => setMaxIterations(Number(e.target.value))}
+                  className="h-8 text-xs font-mono border-border/70"
                   required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                <label className="block text-xs font-medium text-muted-foreground">
                   Engine Mode
                 </label>
                 <select
                   value={simulation ? "true" : "false"}
                   onChange={(e) => setSimulation(e.target.value === "true")}
-                  className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs font-mono text-foreground focus:border-primary focus:outline-none"
+                  className="w-full h-8 rounded-md border border-border/70 bg-card px-2.5 text-xs text-foreground focus:border-border focus:outline-none"
                 >
                   <option value="true">Simulation Mode (Fixture Targets)</option>
-                  <option value="false">Live Agent Mode (Bifrost Gateway)</option>
+                  <option value="false">Live Agent Mode (Active Gateway)</option>
                 </select>
               </div>
             </div>
 
             {/* Launch Action */}
-            <div className="flex items-center justify-end pt-4 border-t border-border">
+            <div className="flex items-center justify-end pt-4 border-t border-border/60">
               <Button
                 type="submit"
                 disabled={isSubmitting || !scopeValidation.valid}
-                size="lg"
+                size="default"
                 className="gap-2"
               >
-                <Rocket className="h-4 w-4" />
-                <span>{isSubmitting ? "Initializing Pipeline..." : "Engage Agent"}</span>
+                <Rocket className="h-3.5 w-3.5" />
+                <span>{isSubmitting ? "Initializing Pipeline..." : "Launch Assessment"}</span>
               </Button>
             </div>
           </form>

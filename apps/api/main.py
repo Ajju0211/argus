@@ -82,6 +82,27 @@ def create_app(
     def health() -> dict[str, str]:
         return {"status": "ok", "service": "argus-api"}
 
+    @app.post("/api/v1/proof/verify", tags=["proof"])
+    async def verify_proof_upload(request: Request) -> JSONResponse:
+        """Verifies an uploaded .argusproof Proof Capsule archive (Spec 11)."""
+        import tempfile
+        from core.evidence.proof_capsule import verify_capsule_archive
+
+        body = await request.body()
+        if not body:
+            return JSONResponse({"verdict": "FAILED", "reasons": ["Empty request body"]}, status_code=400)
+
+        with tempfile.NamedTemporaryFile(suffix=".argusproof", delete=False) as tmp:
+            tmp.write(body)
+            tmp_path = Path(tmp.name)
+
+        try:
+            result = verify_capsule_archive(tmp_path)
+            return JSONResponse(result)
+        finally:
+            if tmp_path.exists():
+                tmp_path.unlink()
+
     @app.get("/", include_in_schema=False)
     def dashboard() -> Any:
         index = STATIC_DIR / "index.html"

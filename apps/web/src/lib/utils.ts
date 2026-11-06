@@ -46,28 +46,34 @@ export function truncateHash(hash: string, length = 8): string {
 export function getSeverityColor(severity: string) {
   switch (severity?.toUpperCase()) {
     case "CRITICAL":
+      return {
+        bg: "bg-card",
+        border: "border-border/80 hover:border-zinc-600 dark:hover:border-zinc-500",
+        text: "text-foreground",
+        badge: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 font-medium",
+      };
     case "HIGH":
       return {
-        bg: "bg-destructive/10",
-        border: "border-destructive/30",
-        text: "text-destructive",
-        badge: "bg-destructive/15 text-destructive border-destructive/30",
+        bg: "bg-card",
+        border: "border-border/80 hover:border-zinc-600 dark:hover:border-zinc-500",
+        text: "text-foreground",
+        badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-medium",
       };
     case "MEDIUM":
       return {
-        bg: "bg-muted",
-        border: "border-border",
+        bg: "bg-card",
+        border: "border-border/80",
         text: "text-foreground",
-        badge: "bg-muted text-foreground border-border",
+        badge: "bg-muted text-muted-foreground border-border font-medium",
       };
     case "LOW":
     case "INFO":
     default:
       return {
-        bg: "bg-muted/50",
-        border: "border-border",
+        bg: "bg-card",
+        border: "border-border/80",
         text: "text-muted-foreground",
-        badge: "bg-muted text-muted-foreground border-border",
+        badge: "bg-muted text-muted-foreground border-border font-medium",
       };
   }
 }
@@ -76,29 +82,28 @@ export function getStatusColor(status: string) {
   switch (status?.toUpperCase()) {
     case "RUNNING":
       return {
-        badge: "bg-primary/10 text-primary border-primary/30",
-        dot: "bg-primary animate-pulse",
+        badge: "bg-muted/50 text-foreground border-border",
+        dot: "bg-emerald-500 animate-pulse",
       };
     case "SUCCESS":
     case "COMPLETED":
       return {
-        badge: "bg-primary/10 text-primary border-primary/30",
-        dot: "bg-primary",
+        badge: "bg-muted/50 text-foreground border-border",
+        dot: "bg-emerald-500",
       };
     case "FAILED":
     case "CANCELLED":
       return {
-        badge: "bg-destructive/10 text-destructive border-destructive/30",
-        dot: "bg-destructive",
+        badge: "bg-muted/50 text-rose-600 dark:text-rose-400 border-rose-500/20",
+        dot: "bg-rose-500",
       };
     case "PAUSED":
     case "READY":
     case "QUEUED":
     default:
       return {
-        badge: "bg-muted text-muted-foreground border-border",
-        dot: "bg-muted-foreground",
+        badge: "bg-muted/50 text-muted-foreground border-border",
+        dot: "bg-zinc-400 dark:bg-zinc-600",
       };
   }
 }
-

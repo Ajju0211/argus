@@ -6,7 +6,6 @@ import { ArrowLeft, ShieldCheck, ShieldAlert, CheckCircle2, Lock, Flame } from "
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
 export default function ScopeFirewallPage() {
   const [testHost, setTestHost] = useState("169.254.169.254");
@@ -31,26 +30,26 @@ export default function ScopeFirewallPage() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Top Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Link href="/" className="hover:text-foreground flex items-center gap-1 transition-colors">
           <ArrowLeft className="h-3 w-3" />
           Command Center
         </Link>
         <span>/</span>
-        <span className="text-foreground">Scope & Policy Firewall Tool</span>
+        <span className="text-foreground font-medium">Scope Firewall</span>
       </div>
 
-      <Card>
+      <Card className="border-border/70">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-xl">Deterministic Policy Firewall</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Deterministic Policy Firewall</CardTitle>
               <CardDescription>
                 Strict authorization boundaries preventing agent drift, lateral movement, and out-of-scope attacks.
               </CardDescription>
             </div>
-            <Badge variant="success" className="gap-1.5 font-mono">
-              <ShieldCheck className="h-3.5 w-3.5" />
+            <Badge variant="outline" className="gap-1.5 w-fit font-normal text-xs border-border/80">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
               Pre-Execution Gate Active
             </Badge>
           </div>
@@ -59,46 +58,46 @@ export default function ScopeFirewallPage() {
         <CardContent className="space-y-6">
           {/* Active Firewall Rules Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="bg-muted/30">
+            <Card className="bg-muted/20 border-border/50">
               <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">
+                <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
                   Authorized Subnets (Allowlist)
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-1 space-y-2 font-mono text-xs">
-                <div className="flex items-center justify-between p-2 rounded bg-background border border-border">
+                <div className="flex items-center justify-between p-2 rounded bg-card border border-border/60">
                   <span>172.16.0.0/12</span>
-                  <Badge variant="success">Docker Bridge Lab</Badge>
+                  <Badge variant="outline" className="text-[10px] font-normal">Docker Bridge Lab</Badge>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded bg-background border border-border">
+                <div className="flex items-center justify-between p-2 rounded bg-card border border-border/60">
                   <span>192.168.100.0/24</span>
-                  <Badge variant="outline">Staging Range</Badge>
+                  <Badge variant="outline" className="text-[10px] font-normal">Staging Range</Badge>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded bg-background border border-border">
+                <div className="flex items-center justify-between p-2 rounded bg-card border border-border/60">
                   <span>127.0.0.1/32</span>
-                  <Badge variant="outline">Localhost Fixtures</Badge>
+                  <Badge variant="outline" className="text-[10px] font-normal">Localhost Fixtures</Badge>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-muted/30">
+            <Card className="bg-muted/20 border-border/50">
               <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">
+                <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
                   Prohibited Zones (Denylist)
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-1 space-y-2 font-mono text-xs">
-                <div className="flex items-center justify-between p-2 rounded bg-background border border-border">
+                <div className="flex items-center justify-between p-2 rounded bg-card border border-border/60">
                   <span>169.254.169.254/32</span>
-                  <Badge variant="destructive">AWS/GCP Metadata</Badge>
+                  <Badge variant="destructive" className="text-[10px] font-normal">Cloud Metadata</Badge>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded bg-background border border-border">
+                <div className="flex items-center justify-between p-2 rounded bg-card border border-border/60">
                   <span>0.0.0.0/8</span>
-                  <Badge variant="destructive">Broadcast / Null</Badge>
+                  <Badge variant="destructive" className="text-[10px] font-normal">Broadcast / Null</Badge>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded bg-background border border-border">
+                <div className="flex items-center justify-between p-2 rounded bg-card border border-border/60">
                   <span>Port 22, 25, 445</span>
-                  <Badge variant="destructive">Denied Ports</Badge>
+                  <Badge variant="destructive" className="text-[10px] font-normal">Denied Ports</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -106,10 +105,10 @@ export default function ScopeFirewallPage() {
 
           {/* Prohibited Categories */}
           <div className="space-y-2">
-            <h4 className="text-xs font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+            <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
               Strictly Prohibited Exploitation Classes
             </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 font-mono text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
               {[
                 "Denial of Service (DoS)",
                 "Credential Brute-Force",
@@ -120,9 +119,9 @@ export default function ScopeFirewallPage() {
               ].map((category) => (
                 <div
                   key={category}
-                  className="p-2.5 rounded-md border border-destructive/25 bg-destructive/10 text-destructive text-[11px] font-semibold flex items-center gap-2"
+                  className="p-2.5 rounded-md border border-border/60 bg-muted/20 text-foreground/80 text-[11px] font-medium flex items-center gap-2"
                 >
-                  <Lock className="h-3 w-3 shrink-0" />
+                  <Lock className="h-3 w-3 text-muted-foreground/60 shrink-0" />
                   <span>{category}</span>
                 </div>
               ))}
@@ -130,56 +129,59 @@ export default function ScopeFirewallPage() {
           </div>
 
           {/* Interactive Policy Inspector */}
-          <div className="rounded-lg border border-border bg-card p-5 space-y-4">
+          <div className="rounded-lg border border-border/70 bg-card p-4 sm:p-5 space-y-4">
             <div className="flex items-center gap-2">
-              <Flame className="h-4 w-4 text-primary" />
-              <h4 className="text-xs font-mono uppercase tracking-wider text-foreground font-bold">
+              <Flame className="h-4 w-4 text-muted-foreground/60" />
+              <h4 className="text-xs uppercase tracking-wider text-foreground font-semibold">
                 Live Policy Boundary Simulator
               </h4>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
-                <label className="text-[11px] font-mono text-muted-foreground">Target Host</label>
+                <label className="text-xs text-muted-foreground font-medium">Target Host</label>
                 <Input
                   value={testHost}
                   onChange={(e) => setTestHost(e.target.value)}
                   placeholder="e.g. 172.16.0.5"
+                  className="font-mono text-xs"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-mono text-muted-foreground">Target Port</label>
+                <label className="text-xs text-muted-foreground font-medium">Target Port</label>
                 <Input
                   value={testPort}
                   onChange={(e) => setTestPort(e.target.value)}
                   placeholder="e.g. 8080"
+                  className="font-mono text-xs"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-mono text-muted-foreground">Simulated Command</label>
+                <label className="text-xs text-muted-foreground font-medium">Simulated Command</label>
                 <Input
                   value={testCommand}
                   onChange={(e) => setTestCommand(e.target.value)}
                   placeholder="e.g. nmap -sV -p 8080"
+                  className="font-mono text-xs"
                 />
               </div>
             </div>
 
             <div
-              className={`p-3 rounded-md border font-mono text-xs flex items-center gap-2.5 ${
+              className={`p-3 rounded-md border text-xs flex items-center gap-2.5 ${
                 evaluationResult.allowed
-                  ? "border-primary/30 bg-primary/10 text-primary"
-                  : "border-destructive/30 bg-destructive/10 text-destructive"
+                  ? "border-border bg-muted/40 text-foreground"
+                  : "border-rose-500/30 bg-rose-500/5 text-rose-500 dark:text-rose-400"
               }`}
             >
               {evaluationResult.allowed ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
               ) : (
-                <ShieldAlert className="h-4 w-4 shrink-0" />
+                <ShieldAlert className="h-4 w-4 text-rose-500 shrink-0" />
               )}
-              <span>{evaluationResult.reason}</span>
+              <span className="font-mono text-xs">{evaluationResult.reason}</span>
             </div>
           </div>
         </CardContent>

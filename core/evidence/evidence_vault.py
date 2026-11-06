@@ -17,6 +17,12 @@ from packages.contracts.findings import EvidenceArtifact
 # Whitelist safe identifier syntax to block directory traversal attacks
 SAFE_ID_REGEX = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
+# Spec 08 Section 4: M1 Resource Constraints & Disk Quota (10 MB per artifact)
+MAX_ARTIFACT_SIZE_BYTES: int = 10 * 1024 * 1024
+TRUNCATION_WARNING: str = (
+    "\n\n[TRUNCATED: Exceeded 10MB artifact limit. Scanner output truncated.]\n"
+)
+
 
 class EvidenceVault:
     """Manages raw evidence file persistence, cryptographic hashing, and integrity checks."""
@@ -48,8 +54,26 @@ class EvidenceVault:
         # 1. Redact secrets
         redacted_content, was_redacted = self._redactor.redact(raw_content)
 
-        # 2. Compute SHA-256 hash of the redacted artifact
-        sha256_hash = hashlib.sha256(redacted_content.encode("utf-8")).hexdigest()
+        # 2. Enforce 10 MB artifact quota (Spec 08 Section 4)
+        encoded_bytes = redacted_content.encode("utf-8")
+        is_truncated = False
+        original_size = len(encoded_bytes)
+        meta = dict(metadata or {})
+
+        if original_size > MAX_ARTIFACT_SIZE_BYTES:
+            is_truncated = True
+            # Slice to max bytes cleanly
+            truncated_bytes = encoded_bytes[:MAX_ARTIFACT_SIZE_BYTES]
+            # Decode ignoring incomplete trailing multibyte character, then append warning
+            redacted_content = (
+                truncated_bytes.decode("utf-8", errors="ignore") + TRUNCATION_WARNING
+            )
+            meta["truncated"] = True
+            meta["original_size_bytes"] = original_size
+            encoded_bytes = redacted_content.encode("utf-8")
+
+        # 3. Compute SHA-256 hash of the final persisted artifact
+        sha256_hash = hashlib.sha256(encoded_bytes).hexdigest()
 
         # 3. Form unique evidence ID and destination paths
         now = datetime.now(UTC)
@@ -85,7 +109,7 @@ class EvidenceVault:
             content_type=content_type,
             redacted=was_redacted,
             prev_hash=prev_hash,
-            metadata=metadata or {},
+            metadata=meta,
         )
 
         # 7. Append to metadata.jsonl
