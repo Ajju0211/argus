@@ -8,6 +8,14 @@ import { AppHeader } from "@/components/layout/AppHeader";
 export const metadata: Metadata = {
   title: "ARGUS — Autonomous Security Operations",
   description: "Autonomous Security Operations. Verified by Cryptographic Evidence.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "64x64", type: "image/x-icon" },
+      { url: "/argus_logo.png", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
