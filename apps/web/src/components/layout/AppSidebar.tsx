@@ -84,9 +84,9 @@ export function AppSidebar() {
               <img
                 src="/argus_logo.png"
                 alt="ARGUS"
-                className="h-8 w-8 object-contain shrink-0 rounded-xs dark:invert-0 invert"
+                className="h-6 w-auto object-contain shrink-0 rounded-xs dark:invert-0 invert"
               />
-              <span className="font-sans text-sm font-semibold tracking-tight text-foreground truncate">
+              <span className="font-sans text-sm sm:text-md font-semibold tracking-tight text-foreground truncate">
                 ARGUS
               </span>
             </Link>
@@ -105,14 +105,14 @@ export function AppSidebar() {
             <button
               onClick={toggleSidebar}
               type="button"
-              className="group flex h-9 w-9 items-center justify-center rounded-md hover:bg-sidebar-accent transition-colors"
+              className="group flex h-12 w-12 items-center justify-center rounded-md hover:bg-sidebar-accent transition-colors"
               aria-label="Expand sidebar"
               title="Expand sidebar"
             >
               <img
                 src="/argus_logo.png"
                 alt="ARGUS"
-                className="h-7 w-7 object-contain rounded-xs dark:invert-0 invert group-hover:hidden"
+                className="h-8 w-full object-contain rounded-xs dark:invert-0 invert group-hover:hidden"
               />
               <PanelLeftOpen className="h-4 w-4 text-foreground hidden group-hover:block" />
             </button>
