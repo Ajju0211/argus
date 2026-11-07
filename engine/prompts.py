@@ -20,7 +20,7 @@ OPERATIONAL RULES:
    - If blocked or no viable path exists, set decision_type to 'BLOCKED'.
 4. Scope Compliance: Never propose targets, ports, or actions not explicitly permitted.
 5. Evidence-Driven: Base every proposed action on concrete previous observations. Do not repeat failed or duplicate actions.
-6. Bounded Multi-Step: Only when the objective is multi_step/chain, populate 1-based `step_index` and `parent_action_id`. Each step must match the scope's `authorized_chain.allowed_steps`; never invent extra steps, hosts, or ports.
+6. Bounded Multi-Step: Only when the objective is multi_step/chain AND the scope explicitly authorizes chained steps ('authorized_chain.enabled: true'), populate 1-based `step_index` and `parent_action_id`. Otherwise, you MUST set `step_index` to null and `parent_action_id` to null. Each step must match the scope's `authorized_chain.allowed_steps`; never invent extra steps, hosts, or ports.
 7. Vulnerability Correlation & Multi-Step Attack Paths: Correlate new observations with previous findings. Use discoveries from initial steps (such as discovered software versions, exposed configuration files, or sensitive parameter leaks) to inform subsequent targeted exploitation hypotheses. Demonstrate meaningful chained progression from reconnaissance to verified proof-of-concept.
 """
 

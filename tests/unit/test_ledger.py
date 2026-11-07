@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from core.evidence.ledger import AssessmentLedger
 from core.evidence.merkle_log import canonical_json, leaf_hash, verify_inclusion
 
@@ -90,4 +88,32 @@ class TestAssessmentLedger:
         valid, msg = ledger.verify_ledger_integrity()
         assert valid is False
         assert "Broken seq continuity" in msg
+
+    def test_policy_denial_appended_to_ledger(self, tmp_path: Path) -> None:
+        ledger_path = tmp_path / "ledger.jsonl"
+        ledger = AssessmentLedger(ledger_path, assessment_id="asm-denial-test")
+
+        seq, tree, _proof = ledger.append_policy_denial(
+            action_id="act-blocked-001",
+            tool="nmap",
+            target_host="10.0.0.99",
+            target_port=80,
+            arguments={"ports": "80"},
+            reason="Host 10.0.0.99 is outside allowed targets.",
+        )
+
+        assert seq == 0
+        assert tree.tree_size == 1
+        recs = ledger.records()
+        assert len(recs) == 1
+        record = recs[0]
+        assert record["tier"] == "T1_POLICY"
+        assert record["event"] == "policy_denial"
+        assert record["action_id"] == "act-blocked-001"
+        assert record["denial_reason"] == "Host 10.0.0.99 is outside allowed targets."
+        assert "POLICY_DENIED" in record["stderr_sha256"] or record["exit_code"] == -1
+
+        # Tree root can be verified against Merkle leaf
+        leaf = leaf_hash(canonical_json(record))
+        assert leaf == tree.root
 

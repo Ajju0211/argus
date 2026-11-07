@@ -1,0 +1,36 @@
+id: lab-exposed-env
+
+info:
+  name: ARGUS Lab - Exposed .env File with Secrets
+  author: argus-lab
+  severity: high
+  description: |
+    The application exposes its .env file at the web root, disclosing database
+    credentials, cloud access keys, and signing secrets.
+  reference:
+    - https://owasp.org/www-project-top-ten/2017/A3_2017-Sensitive_Data_Exposure
+  classification:
+    cwe-id: CWE-200
+  tags: lab,exposure,secrets,config
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/.env"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - "DB_PASSWORD="
+          - "AWS_ACCESS_KEY_ID="
+        condition: and
+    extractors:
+      - type: regex
+        part: body
+        regex:
+          - "(?m)^DB_PASSWORD=.*$"
+          - "(?m)^AWS_ACCESS_KEY_ID=.*$"

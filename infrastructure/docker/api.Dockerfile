@@ -12,15 +12,33 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # curl is used by container healthchecks and HTTP adapters.
+# nmap provides real (unprivileged -sT) network reconnaissance. unzip is only
+# needed to install the pinned Nuclei release below.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl nmap unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Pinned Nuclei binary used for active verification of lab findings.
+ARG NUCLEI_VERSION=3.3.0
+RUN ARCH="$(dpkg --print-architecture)" \
+    && curl -sSL "https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}/nuclei_${NUCLEI_VERSION}_linux_${ARCH}.zip" -o /tmp/nuclei.zip \
+    && unzip -o /tmp/nuclei.zip -d /usr/local/bin \
+    && chmod 755 /usr/local/bin/nuclei \
+    && rm -f /tmp/nuclei.zip \
+    && nuclei -version
 
 RUN useradd -m -u 1000 argus \
     && mkdir -p /app/artifacts /app/data \
     && chown -R argus:argus /app
 
 COPY pyproject.toml README.md ./
+
+# Pinned, non-destructive verification templates for the mock lab. Nuclei is
+# only ever allowed to load templates from this directory (see
+# integrations/tools/nuclei_adapter.py).
+COPY infrastructure/docker/lab/templates/ /templates/pinned/
+RUN chown -R root:root /templates \
+    && chmod -R 555 /templates
 
 # ==============================================================================
 # Development stage: runs uvicorn with --reload for auto-reloading on code changes

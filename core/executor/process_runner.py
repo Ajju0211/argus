@@ -8,9 +8,102 @@ import asyncio
 import os
 import signal
 import sys
+import threading
 
 # Maximum raw output limit to prevent out-of-memory denial of service (50 MB)
 MAX_STDOUT_BYTES = 50 * 1024 * 1024
+
+# Sensitive substrings that must NEVER appear in subprocess environment
+SENSITIVE_ENV_SUBSTRINGS = (
+    "KEY",
+    "SECRET",
+    "TOKEN",
+    "PASSWORD",
+    "PASSWD",
+    "CREDENTIAL",
+    "AUTH",
+    "DATABASE",
+    "ARGUS_",
+    "ANTHROPIC_",
+    "OPENAI_",
+    "AWS_",
+    "AZURE_",
+    "GCP_",
+    "GOOGLE_",
+    "PRIVATE",
+)
+
+# Standard safe system environment variables
+SAFE_ENV_VARS = (
+    "PATH",
+    "LANG",
+    "LANGUAGE",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TERM",
+)
+
+_ACTIVE_PROCESSES: dict[str, set[int]] = {}
+_PROCESS_LOCK = threading.Lock()
+
+
+def get_sanitized_env(extra_env: dict[str, str] | None = None) -> dict[str, str]:
+    """Builds a strictly sanitized environment dictionary for subprocess isolation (SEC-02).
+
+    Prevents sensitive keys, API secrets, tokens, and database credentials from
+    leaking into external tool subprocesses.
+    """
+    clean_env: dict[str, str] = {}
+
+    for var in SAFE_ENV_VARS:
+        if var in os.environ:
+            clean_env[var] = os.environ[var]
+
+    if "PATH" not in clean_env:
+        clean_env["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+    clean_env["HOME"] = "/tmp"
+    clean_env["TMPDIR"] = "/tmp"
+
+    if extra_env:
+        for k, v in extra_env.items():
+            k_upper = k.upper()
+            if any(sub in k_upper for sub in SENSITIVE_ENV_SUBSTRINGS):
+                continue
+            clean_env[k] = str(v)
+
+    return clean_env
+
+
+def register_active_process(assessment_id: str, pid: int) -> None:
+    """Registers an active child process PID under an assessment ID (SEC-09)."""
+    with _PROCESS_LOCK:
+        if assessment_id not in _ACTIVE_PROCESSES:
+            _ACTIVE_PROCESSES[assessment_id] = set()
+        _ACTIVE_PROCESSES[assessment_id].add(pid)
+
+
+def unregister_active_process(assessment_id: str, pid: int) -> None:
+    """Unregisters a completed or killed child process PID."""
+    with _PROCESS_LOCK:
+        if assessment_id in _ACTIVE_PROCESSES:
+            _ACTIVE_PROCESSES[assessment_id].discard(pid)
+            if not _ACTIVE_PROCESSES[assessment_id]:
+                del _ACTIVE_PROCESSES[assessment_id]
+
+
+def terminate_active_processes(assessment_id: str) -> int:
+    """Deterministically kills all active process groups running for an assessment (SEC-09).
+
+    Returns the number of processes targeted for termination.
+    """
+    with _PROCESS_LOCK:
+        pids = list(_ACTIVE_PROCESSES.pop(assessment_id, set()))
+
+    for pid in pids:
+        kill_process_group(pid)
+
+    return len(pids)
 
 
 def kill_process_group(pid: int) -> None:
@@ -39,12 +132,18 @@ def kill_process_group(pid: int) -> None:
 async def run_tool_process(
     cmd: list[str],
     timeout_seconds: int = 120,
+    assessment_id: str | None = None,
+    extra_env: dict[str, str] | None = None,
+    cwd: str = "/tmp",
 ) -> tuple[int, str, str]:
     """Executes a command array safely within a detached process group.
 
     Args:
         cmd: List of execution arguments (argv array).
         timeout_seconds: Maximum wall-clock seconds before termination.
+        assessment_id: Assessment tracking ID for lifecycle abort tracking.
+        extra_env: Extra non-sensitive environment variables.
+        cwd: Working directory (defaults to /tmp).
 
     Returns:
         tuple of (returncode, stdout, stderr)
@@ -56,6 +155,9 @@ async def run_tool_process(
     if not cmd or not any(cmd):
         raise ValueError("Cannot execute empty command")
 
+    sanitized_env = get_sanitized_env(extra_env)
+    effective_cwd = cwd if os.path.exists(cwd) else None
+
     # On POSIX systems, start in a new process group so child processes can be killed as a group
     is_posix = sys.platform != "win32"
     if is_posix:
@@ -64,13 +166,20 @@ async def run_tool_process(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             start_new_session=True,
+            env=sanitized_env,
+            cwd=effective_cwd,
         )
     else:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=sanitized_env,
+            cwd=effective_cwd,
         )
+
+    if assessment_id and proc.pid:
+        register_active_process(assessment_id, proc.pid)
 
     try:
         stdout_bytes, stderr_bytes = await asyncio.wait_for(
@@ -100,6 +209,18 @@ async def run_tool_process(
         raise TimeoutError(
             f"Tool execution for '{cmd[0]}' timed out after {timeout_seconds}s"
         ) from e
+    except asyncio.CancelledError:
+        # Prevent orphaned processes on async task cancellation (SEC-09)
+        if proc.pid:
+            kill_process_group(proc.pid)
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=1.0)
+        except (TimeoutError, OSError, asyncio.CancelledError):
+            pass
+        raise
+    finally:
+        if assessment_id and proc.pid:
+            unregister_active_process(assessment_id, proc.pid)
 
 
 def build_docker_sandbox_command(

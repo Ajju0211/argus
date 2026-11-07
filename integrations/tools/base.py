@@ -89,9 +89,12 @@ class ToolAdapter(ABC):
 
     def get_descriptor(self) -> dict[str, Any]:
         """Exports tool metadata for dynamic LangGraph orchestrator discovery."""
-        return {
+        desc: dict[str, Any] = {
             "tool_name": self.tool_name,
             "capabilities": self.capabilities,
             "categories": self.categories,
             "risk_level": self.risk_level,
         }
+        if self.args_schema:
+            desc["args_schema"] = self.args_schema.model_json_schema()
+        return desc

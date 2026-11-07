@@ -2,13 +2,21 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { useAssessmentStream } from "@/lib/useAssessmentStream";
 import { BifrostHUD } from "@/components/navigation/BifrostHUD";
+import { DeleteAssessmentDialog } from "@/components/assessments/DeleteAssessmentDialog";
+import { LiveAgentPanel } from "@/components/live/LiveAgentPanel";
 import { AuditTimeline } from "@/components/live/AuditTimeline";
 import { TopologyGrid } from "@/components/live/TopologyGrid";
 import { FindingsBoard } from "@/components/live/FindingsBoard";
-import { pauseAssessment, resumeAssessment, cancelAssessment } from "@/lib/api";
+import {
+  cancelAssessment,
+  deleteAssessment,
+  pauseAssessment,
+  resumeAssessment,
+} from "@/lib/api";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -17,8 +25,13 @@ interface PageProps {
 export default function AssessmentLivePage({ params }: PageProps) {
   const resolvedParams = use(params);
   const assessmentId = resolvedParams.id;
-  const { assessment, events, refresh } = useAssessmentStream(assessmentId);
+  const router = useRouter();
+  const { assessment, events, connectionStatus, refresh } =
+    useAssessmentStream(assessmentId);
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handlePause = async () => {
     setIsActionLoading(true);
@@ -54,6 +67,27 @@ export default function AssessmentLivePage({ params }: PageProps) {
     } finally {
       setIsActionLoading(false);
     }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAssessment(assessmentId);
+      setIsDeleteDialogOpen(false);
+      router.push("/");
+      router.refresh();
+    } catch (err: any) {
+      setDeleteError(err?.message || "Failed to delete assessment.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const closeDeleteDialog = () => {
+    if (isDeleting) return;
+    setIsDeleteDialogOpen(false);
+    setDeleteError(null);
   };
 
   const handleDownloadPdf = () => {
@@ -104,8 +138,18 @@ export default function AssessmentLivePage({ params }: PageProps) {
         onPause={handlePause}
         onResume={handleResume}
         onCancel={handleCancel}
+        onDelete={() => {
+          setDeleteError(null);
+          setIsDeleteDialogOpen(true);
+        }}
         onDownloadPdf={handleDownloadPdf}
         isActionLoading={isActionLoading}
+      />
+
+      <LiveAgentPanel
+        assessment={assessment}
+        events={events}
+        connectionStatus={connectionStatus}
       />
 
       {/* Main Dual-Pane Live Grid */}
@@ -122,6 +166,15 @@ export default function AssessmentLivePage({ params }: PageProps) {
           />
         </div>
       </div>
+
+      <DeleteAssessmentDialog
+        open={isDeleteDialogOpen}
+        assessment={assessment}
+        isDeleting={isDeleting}
+        error={deleteError}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

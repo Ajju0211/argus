@@ -1,0 +1,30 @@
+id: lab-cgi-env-disclosure
+
+info:
+  name: ARGUS Lab - CGI Environment Disclosure
+  author: argus-lab
+  severity: medium
+  description: |
+    /cgi-bin/info.sh prints the full CGI environment, process identity, and
+    kernel details to unauthenticated users.
+  reference:
+    - https://owasp.org/www-community/vulnerabilities/Information_exposure
+  classification:
+    cwe-id: CWE-200
+  tags: lab,exposure,cgi
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/cgi-bin/info.sh"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - "ARGUS lab CGI environment"
+          - "REMOTE_ADDR="
+        condition: and

@@ -165,6 +165,7 @@ class NmapAdapter(ToolAdapter):
         # Deterministic base scan command
         cmd = [
             "nmap",
+            "-Pn",  # Treat all hosts as online (unprivileged container compatibility)
             "-sT",  # Unprivileged TCP Connect scan
             "-sV",  # Service version detection
             "-T4",  # Aggressive timing for lab responsiveness

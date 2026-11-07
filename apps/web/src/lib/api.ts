@@ -19,6 +19,9 @@ export async function createAssessment(payload: {
   target: string | { type: string; value: string };
   scope_yaml?: string;
   scope?: string | Record<string, unknown>;
+  scope_document?: Record<string, unknown>;
+  imported_scope_hash?: string;
+  auto_confirm?: boolean;
   objective?: string | Record<string, unknown>;
   simulation?: boolean;
   auto_start?: boolean;
@@ -33,6 +36,53 @@ export async function createAssessment(payload: {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.detail || `Failed to create assessment: ${res.statusText}`);
   }
+  return res.json();
+}
+
+export interface ScopeParseResponse {
+  is_valid: boolean;
+  scope_hash: string | null;
+  format_detected: string;
+  parsing_confidence: "DETERMINISTIC" | "HEURISTIC";
+  read_back: {
+    assessment_name: string;
+    scope_hash: string;
+    parsed_format: string;
+    parsing_confidence: string;
+    summary: {
+      authorized_targets: string[];
+      allowed_subnets: string[];
+      denied_boundaries: string[];
+      permitted_ports: number[];
+      permitted_actions: string[];
+      multi_host_pivoting: boolean;
+      objective: {
+        type: string;
+        minimum_proof?: string;
+        description?: string;
+        requires_operator_upgrade?: boolean;
+      };
+      budget: {
+        max_iterations: number;
+        max_duration_minutes: number;
+      };
+    };
+    warnings: string[];
+  } | null;
+  normalized_yaml: string | null;
+  errors: string[];
+  warnings: string[];
+}
+
+export async function parseScope(
+  content: string,
+  filename?: string
+): Promise<ScopeParseResponse> {
+  const res = await fetch("/api/v1/scope/parse", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_content: content, filename }),
+  });
   return res.json();
 }
 
@@ -57,6 +107,15 @@ export async function resumeAssessment(id: string): Promise<StatusResponse> {
 export async function cancelAssessment(id: string): Promise<StatusResponse> {
   const res = await fetch(`${BASE_URL}/${id}/cancel`, { method: "POST" });
   if (!res.ok) throw new Error(`Failed to cancel: ${res.statusText}`);
+  return res.json();
+}
+
+export async function deleteAssessment(id: string): Promise<StatusResponse> {
+  const res = await fetch(`${BASE_URL}/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to delete assessment: ${res.statusText}`);
+  }
   return res.json();
 }
 

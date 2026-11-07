@@ -8,6 +8,7 @@ Supports clean execution pausing, checkpoint persistence, and resumption.
 import json
 import logging
 import threading
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -15,7 +16,9 @@ from uuid import uuid4
 
 from apps.api.database import TERMINAL_STATUSES, Database
 from core.evidence.evidence_vault import EvidenceVault
+from core.executor.process_runner import terminate_active_processes
 from engine.graph import AssessmentOrchestrator, create_initial_state
+from integrations.langfuse import LangfuseTracer
 from packages.contracts.scope import ScopeDocument
 
 logger = logging.getLogger(__name__)
@@ -77,6 +80,13 @@ class AssessmentRunner:
         self.simulation_default = simulation_default
         self.model_gateway = model_gateway
         self.tool_executor = tool_executor
+        self._active_assessments: set[str] = set()
+        self._runner_lock = threading.Lock()
+
+    def is_active(self, assessment_id: str) -> bool:
+        """Return True while a worker thread is still executing this assessment."""
+        with self._runner_lock:
+            return assessment_id in self._active_assessments
 
     def launch(
         self,
@@ -90,6 +100,15 @@ class AssessmentRunner:
         max_iterations: int,
         initial_state: dict[str, Any] | None = None,
     ) -> None:
+        with self._runner_lock:
+            if assessment_id in self._active_assessments:
+                logger.warning(
+                    "Assessment %s already has an active worker thread; ignoring duplicate launch",
+                    assessment_id,
+                )
+                return
+            self._active_assessments.add(assessment_id)
+
         thread = threading.Thread(
             target=self._execute,
             args=(
@@ -123,6 +142,34 @@ class AssessmentRunner:
             assessment_id, "assessment_started", data={"simulation": simulation}
         )
 
+        existing_record = self.database.get(assessment_id) or {}
+        existing_trace_id = existing_record.get("langfuse_trace_id")
+        tracer = LangfuseTracer()
+        trace_id, session_id = tracer.start_assessment_trace(
+            assessment_id=assessment_id,
+            target=target,
+            objective=objective,
+            scope_id=scope.assessment_id,
+            simulation=simulation,
+            max_iterations=max_iterations,
+            trace_id=existing_trace_id,
+        )
+        if trace_id:
+            self.database.update_assessment(
+                assessment_id,
+                langfuse_trace_id=trace_id,
+                langfuse_session_id=session_id,
+            )
+            self.database.append_event(
+                assessment_id,
+                "langfuse_trace_linked",
+                node="orchestrator",
+                data={
+                    "langfuse_trace_id": trace_id,
+                    "langfuse_session_id": session_id,
+                },
+            )
+
         orchestrator = AssessmentOrchestrator(
             scope=scope,
             evidence_vault=EvidenceVault(base_dir=self.artifacts_dir),
@@ -130,6 +177,7 @@ class AssessmentRunner:
             tool_executor=self.tool_executor,
             simulation_mode=simulation,
             cancel_check=lambda: self.database.is_cancel_requested(assessment_id),
+            tracer=tracer,
         )
 
         if initial_state is None:
@@ -146,6 +194,8 @@ class AssessmentRunner:
             state = dict(initial_state)
 
         paused = False
+        emitted_findings: set[str] = set()
+        active_action: dict[str, Any] | None = None
         try:
             for chunk in orchestrator.graph.stream(cast(Any, state), stream_mode="updates"):
                 for node, update in chunk.items():
@@ -174,6 +224,16 @@ class AssessmentRunner:
                             node=str(node),
                             data={"target": target, "scope_id": scope.assessment_id},
                         )
+                        if state.get("status") != "FAILED":
+                            self.database.append_event(
+                                assessment_id,
+                                "recon_started",
+                                node=str(node),
+                                data={
+                                    "target": target,
+                                    "message": "Running service discovery (nmap) against the target",
+                                },
+                            )
                     elif node == "recon":
                         self.database.append_event(
                             assessment_id,
@@ -184,6 +244,31 @@ class AssessmentRunner:
                                 "services": state.get("discovered_services", []),
                             },
                         )
+                    elif node == "normalize_observations":
+                        self.database.append_event(
+                            assessment_id,
+                            "planning_started",
+                            node=str(node),
+                            data={
+                                "message": "Normalizing observations and asking the planner for the next action",
+                                "observations": len(state.get("observations", [])),
+                            },
+                        )
+                    elif node == "plan_action":
+                        action = state.get("current_action")
+                        if action:
+                            active_action = _action_summary(action)
+                            self.database.append_event(
+                                assessment_id,
+                                "action_proposed",
+                                node=str(node),
+                                data={
+                                    "action": active_action,
+                                    "rationale": action.get("rationale", ""),
+                                    "tool_name": action.get("tool_name", ""),
+                                    "target_host": action.get("target_host", ""),
+                                },
+                            )
                     elif node == "policy_gate":
                         action = state.get("current_action")
                         strategy = state.get("current_strategy")
@@ -195,19 +280,32 @@ class AssessmentRunner:
                                 data={"action": _action_summary(action)},
                             )
                         elif action:
+                            active_action = _action_summary(action)
                             self.database.append_event(
                                 assessment_id,
                                 "action_approved",
                                 node=str(node),
-                                data={"action": _action_summary(action)},
+                                data={"action": active_action},
+                            )
+                            self.database.append_event(
+                                assessment_id,
+                                "tool_started",
+                                node=str(node),
+                                data={
+                                    "action": active_action,
+                                    "message": "Executing policy-approved tool",
+                                },
                             )
                     elif node == "execute_tool":
-                        action = state.get("current_action")
+                        action = active_action or _action_summary(state.get("current_action"))
                         self.database.append_event(
                             assessment_id,
                             "tool_completed",
                             node=str(node),
-                            data={"action": _action_summary(action)},
+                            data={
+                                "action": action,
+                                "message": "Tool execution finished; parsing observations",
+                            },
                         )
                         # Sync evidence artifacts to DB
                         for ref in state.get("evidence_refs", []):
@@ -220,16 +318,61 @@ class AssessmentRunner:
                                     file_path=ref.get("file_path", ""),
                                     artifact_id=ev_id,
                                 )
+                        recovery = state.get("recovery") or {}
+                        recovering = bool(
+                            recovery.get("last_failure_type")
+                            and recovery.get("consecutive_failures", 0) > 0
+                        )
+                        next_event = "recovery_started" if recovering else "verification_started"
+                        self.database.append_event(
+                            assessment_id,
+                            next_event,
+                            node=str(node),
+                            data={
+                                "message": (
+                                    "Analyzing the tool failure and planning a recovery action"
+                                    if recovering
+                                    else "Verifying observations and attaching evidence"
+                                ),
+                                "evidence": len(state.get("evidence_refs", [])),
+                            },
+                        )
+                    elif node == "adaptive_recovery":
+                        self.database.append_event(
+                            assessment_id,
+                            "recovery_started",
+                            node=str(node),
+                            data={"message": "Adaptive recovery is selecting a fallback strategy"},
+                        )
                     elif node == "verify_finding":
                         findings = state.get("findings", [])
                         for f in findings:
+                            finding_key = str(
+                                f.get("finding_id") or f.get("id") or f.get("title") or ""
+                            )
                             self.database.save_finding(assessment_id, f)
+                            if finding_key and finding_key in emitted_findings:
+                                continue
+                            if finding_key:
+                                emitted_findings.add(finding_key)
                             self.database.append_event(
                                 assessment_id,
                                 "finding_verified",
                                 node=str(node),
                                 data={"finding": f},
                             )
+                    elif node == "evaluate_completion":
+                        completion = state.get("completion") or {}
+                        self.database.append_event(
+                            assessment_id,
+                            "completion_check",
+                            node=str(node),
+                            data={
+                                "is_completed": completion.get("is_completed", False),
+                                "outcome": completion.get("outcome"),
+                                "message": "Evaluating whether the assessment objective is satisfied",
+                            },
+                        )
                     elif node == "report":
                         self.database.append_event(
                             assessment_id,
@@ -237,6 +380,9 @@ class AssessmentRunner:
                             node=str(node),
                             data={"report_path": state.get("report_path")},
                         )
+
+                    # Pacing delay between node transitions for human-observable execution telemetry
+                    time.sleep(0.3)
 
                     # Check for pause request at safe node boundary
                     if self.database.is_pause_requested(assessment_id):
@@ -272,6 +418,7 @@ class AssessmentRunner:
                     return
 
             if self.database.is_cancel_requested(assessment_id):
+                terminate_active_processes(assessment_id)
                 completion = dict(state.get("completion") or {})
                 completion.update(
                     {
@@ -333,3 +480,15 @@ class AssessmentRunner:
                 completed_at=datetime.now(UTC).isoformat(),
             )
             self.database.append_event(assessment_id, "assessment_failed", data={"error": message})
+        finally:
+            if tracer.is_enabled:
+                tracer.end_assessment_trace(
+                    status=str(state.get("status") or "FAILED"),
+                    outcome=state.get("completion", {}).get("outcome"),
+                    summary=state.get("completion", {}).get("summary"),
+                    findings_count=len(state.get("findings", [])),
+                    budget=state.get("budget"),
+                )
+            with self._runner_lock:
+                self._active_assessments.discard(assessment_id)
+            terminate_active_processes(assessment_id)

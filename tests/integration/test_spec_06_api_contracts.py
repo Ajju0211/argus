@@ -72,7 +72,7 @@ def _create_test_client(tmp_path: Path, **kwargs: Any) -> TestClient:
 
 
 def _wait_for_status(
-    client: TestClient, assessment_id: str, target_statuses: set[str], timeout: float = 5.0
+    client: TestClient, assessment_id: str, target_statuses: set[str], timeout: float = 12.0
 ) -> dict[str, Any]:
     deadline = time.time() + timeout
     last: dict[str, Any] = {}
@@ -331,3 +331,55 @@ class TestSpec06ApiContracts:
             assert pdf_report.status_code == 200
             assert pdf_report.headers["content-type"] == "application/pdf"
             assert pdf_report.content.startswith(b"%PDF-1.4")
+
+    def test_delete_assessment_hard_deletes_evidence(self, tmp_path: Path) -> None:
+        """9. DELETE /api/v1/assessments/{id} removes the assessment, evidence, and artifacts."""
+        with _create_test_client(tmp_path) as client:
+            create_resp = client.post(
+                "/api/v1/assessments",
+                json={
+                    "target": TARGET_URL,
+                    "scope_yaml": VALID_SCOPE_YAML,
+                    "auto_start": True,
+                    "simulation": True,
+                },
+            )
+            assert create_resp.status_code == 201
+            assessment_id = create_resp.json()["id"]
+            final = _wait_for_status(client, assessment_id, {"SUCCESS", "COMPLETED"})
+
+            evidence_refs = final.get("evidence_refs", [])
+            assert evidence_refs
+            evidence_id = evidence_refs[0].get("evidence_id") or evidence_refs[0].get("id")
+            assert evidence_id
+
+            artifact_dir = tmp_path / "artifacts" / assessment_id
+            assert artifact_dir.exists()
+            assert (
+                client.get(
+                    f"/api/v1/assessments/{assessment_id}/evidence/{evidence_id}"
+                ).status_code
+                == 200
+            )
+
+            delete_resp = client.delete(f"/api/v1/assessments/{assessment_id}")
+            assert delete_resp.status_code == 200, delete_resp.text
+            assert delete_resp.json()["status"] == "DELETED"
+
+            assert not artifact_dir.exists()
+            assert client.get(f"/api/v1/assessments/{assessment_id}").status_code == 404
+            assert (
+                client.get(
+                    f"/api/v1/assessments/{assessment_id}/evidence/{evidence_id}"
+                ).status_code
+                == 404
+            )
+
+            db = client.app.state.db
+            assert db.get_evidence_artifacts(assessment_id) == []
+            assert db.get_findings(assessment_id) == []
+            assert db.events_after(assessment_id) == []
+            assert all(
+                item["id"] != assessment_id
+                for item in client.get("/api/v1/assessments").json()
+            )

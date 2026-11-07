@@ -37,7 +37,7 @@ To understand ARGUS completely, let's look through the eyes of the 5 key persona
 ┌─────────────────────────┐   ┌────────────────────────┐   ┌────────────────────────┐
 │  2. THE AUDITOR / JUDGE │   │    3. THE AI AGENT     │   │ 4. FULLSTACK DEVELOPER │
 │  - Tamper-proof hashes  │◄──┤  - LangGraph state     ├──►│ - Next.js 15 UI        │
-│  - Zero hallucinations  │   │  - Reasoning loop      │   │ - FastAPI + SQLite WAL │
+│  - Evidence-backed proof│   │  - Reasoning loop      │   │ - FastAPI + SQLite WAL │
 │  - Policy audit logs    │   │  - Non-destructive POC │   │ - Real-time SSE stream │
 └─────────────────────────┘   └───────────┬────────────┘   └────────────────────────┘
                                           │
@@ -52,16 +52,18 @@ To understand ARGUS completely, let's look through the eyes of the 5 key persona
 - **What they see:** A sleek, dark-mode **Cyber Command Center** (`http://localhost:3000`).
 - **What they do:** 
   1. Click **"New Assessment"**.
-  2. Input the target (e.g., `http://localhost:8888` or `192.168.1.50`), specify the allowed CIDR subnet, and pick a safety tier (`Safe`, `Standard`, or `Aggressive`).
-  3. Hit **"Engage Agent"**.
-- **The Experience:** The screen transforms into a live terminal HUD. They see the AI agent's internal monologue, the active state machine node (Reconnaissance ➡️ Probing ➡️ Exploitation ➡️ Verification), and findings pop up live with CVSS scores. If anything looks concerning, they hit the big red **"Pause"** or **"Emergency Abort"** button.
+  2. Upload or paste any scope file supplied by judges or clients (YAML, JSON, or plain text / Markdown fallback), or select a preset fixture.
+  3. Review the **Operator Scope Read-Back Attestation** ("I will test: [entry hosts / allowed targets / ports]" vs "I will NOT touch: [denied hosts / reserved IPs / prohibited categories]").
+  4. Hit **"Engage Assessment Pipeline"**.
+- **The Experience:** The screen transforms into a live terminal HUD. They see the AI agent's internal monologue, the active state machine node (Reconnaissance ➡️ Probing ➡️ Exploitation ➡️ Verification), and findings pop up live with CVSS scores. If anything looks concerning, they hit the big red **"Pause"** or **"Emergency Abort"** button (which terminates all active child process groups immediately).
 
 ### 2. The Hackathon Judge & Compliance Auditor's POV ("Can I Trust This?")
 - **The Concern:** "Did the AI actually find an SQL injection, or is the LLM just hallucinating a vulnerability to look smart?"
 - **The ARGUS Guarantee:** 
   - **Zero Unverified Findings:** ARGUS has a dedicated **Verification Node**. An exploit is never marked as a finding unless it is independently re-tested and proven.
   - **Evidence Vault:** Every single finding links to an immutable evidence block containing the raw HTTP request sent, the exact HTTP response received, response headers, timestamps, and an unforgeable **SHA-256 digital fingerprint**.
-  - **Full Audit Trail:** A complete JSON log of every decision the agent made, when it made it, and which policy rule permitted it.
+  - **RFC 6962 Merkle Audit Ledger:** Every executed action (Tier-2) and every intercepted policy denial (Tier-1) is anchored in an append-only cryptographic Merkle tree with inclusion proofs.
+  - **Full Audit Trail:** A complete JSON log of every decision the agent made, when it made it, and which policy rule permitted or denied it.
 
 ### 3. The AI Agent Orchestrator's POV ("The Brain")
 - **How it operates:** The agent does not execute a rigid, one-way script. It runs a **dynamic ReAct (Reason + Act) loop** powered by a **LangGraph state machine**.

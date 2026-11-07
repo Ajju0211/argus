@@ -11,8 +11,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from core.config import get_settings
-from packages.contracts.actions import ActionProposal, PolicyDecision
-from packages.contracts.scope import ScopeDocument
+from packages.contracts.actions import ActionProposal, FootholdEvidence, PolicyDecision
+from packages.contracts.scope import PivotRule, ScopeDocument
 
 
 class PolicyEngine:
@@ -28,15 +28,81 @@ class PolicyEngine:
         self._denied_hosts_set = set(scope.targets.denied_hosts)
         self._allowed_hosts_set = set(scope.targets.allowed_hosts)
 
-    def evaluate(self, proposal: ActionProposal) -> PolicyDecision:
+    def evaluate(
+        self,
+        proposal: ActionProposal,
+        footholds: list[FootholdEvidence] | None = None,
+        simulation_mode: bool = False,
+    ) -> PolicyDecision:
         """Determines whether an action is authorized under the active scope."""
         try:
-            return self._evaluate_internal(proposal)
+            return self._evaluate_internal(proposal, footholds=footholds, simulation_mode=simulation_mode)
         except Exception as e:  # noqa: BLE001
             # Mandatory fail-closed behavior on any unexpected exception
             return PolicyDecision(
                 approved=False, reason=f"Policy evaluation failure (fail-closed): {e}"
             )
+
+    def is_target_authorized(
+        self,
+        host: str,
+        footholds: list[FootholdEvidence] | None = None,
+        simulation_mode: bool = False,
+    ) -> bool:
+        """Determines whether a host is authorized for discovery or targeting without raising errors."""
+        resolved_ip = self._resolve_host(host)
+        if not resolved_ip:
+            return False
+        if resolved_ip in self._denied_hosts_set or host in self._denied_hosts_set:
+            return False
+        try:
+            ip_obj = ipaddress.ip_address(resolved_ip)
+            if (
+                ip_obj.is_loopback
+                or ip_obj.is_link_local
+                or ip_obj.is_reserved
+                or ip_obj.is_multicast
+            ):
+                return False
+        except ValueError:
+            return False
+
+        # Network boundary check
+        in_allowed_subnet = any(ip_obj in subnet for subnet in self._parsed_subnets)
+        in_allowed_ip = resolved_ip in self._allowed_hosts_set
+        if self._parsed_subnets and not (in_allowed_subnet or in_allowed_ip):
+            return False
+        if not self._parsed_subnets and ip_obj.is_private:
+            return False
+
+        # In entry hosts?
+        if resolved_ip in self._allowed_hosts_set or host in self._allowed_hosts_set:
+            return True
+        for allowed in self._allowed_hosts_set:
+            if allowed.startswith("*.") and host.endswith(allowed[1:]):
+                return True
+
+        # In authorized pivot rules destination?
+        if self.scope.authorized_chain.enabled and self.scope.authorized_chain.pivots:
+            for pivot in self.scope.authorized_chain.pivots:
+                if pivot.to_host in (host, resolved_ip):
+                    if not pivot.requires_foothold:
+                        return True
+                    now_utc = datetime.now(UTC)
+                    return any(
+                        fh.host == pivot.from_host
+                        and not fh.is_expired(now_utc)
+                        and (simulation_mode or not fh.simulated)
+                        and (not fh.assessment_id or not self.scope.assessment_id or fh.assessment_id == self.scope.assessment_id)
+                        for fh in (footholds or [])
+                    )
+
+        # Fallback if scope has no allowed_hosts and no pivots (legacy loose subnet scope)
+        return bool(
+            not self._allowed_hosts_set
+            and not self.scope.authorized_chain.pivots
+            and in_allowed_subnet
+        )
 
     def _infer_target_port(self, proposal: ActionProposal) -> int | None:
         """Infers target port from proposal target_port, target_host, or arguments (S-01)."""
@@ -233,7 +299,12 @@ class PolicyEngine:
             )
         return None
 
-    def _validate_embedded_targets(self, proposal: ActionProposal) -> PolicyDecision | None:
+    def _validate_embedded_targets(
+        self,
+        proposal: ActionProposal,
+        footholds: list[FootholdEvidence] | None = None,
+        simulation_mode: bool = False,
+    ) -> PolicyDecision | None:
         """Validates outbound URLs carried inside tool arguments (adversarial scope evasion).
 
         The planner can put the tool's real destination in ``target``, ``url``, or
@@ -302,29 +373,21 @@ class PolicyEngine:
                     reason=f"Embedded target IP {resolved_ip} is loopback, link-local, or reserved.",
                 )
 
-            in_allowed_host_or_wildcard = False
-            for allowed in self._allowed_hosts_set:
-                if allowed == resolved_ip or allowed == host:
-                    in_allowed_host_or_wildcard = True
-                    break
-                if allowed.startswith("*.") and host.endswith(allowed[1:]):
-                    in_allowed_host_or_wildcard = True
-                    break
             in_allowed_subnet = any(ip_obj in subnet for subnet in self._parsed_subnets)
             in_allowed_ip = resolved_ip in self._allowed_hosts_set
-            if not (in_allowed_host_or_wildcard or in_allowed_subnet or in_allowed_ip):
-                return PolicyDecision(
-                    approved=False,
-                    reason=(
-                        f"Embedded target '{host}' ({resolved_ip}) is outside allowed targets."
-                    ),
-                )
             if self._parsed_subnets and not (in_allowed_subnet or in_allowed_ip):
                 return PolicyDecision(
                     approved=False,
                     reason=(
                         f"Embedded target '{host}' ({resolved_ip}) is outside authorized "
                         "IP boundaries / DNS rebinding guard."
+                    ),
+                )
+            if not self.is_target_authorized(host, footholds=footholds, simulation_mode=simulation_mode):
+                return PolicyDecision(
+                    approved=False,
+                    reason=(
+                        f"Embedded target '{host}' ({resolved_ip}) is outside allowed targets."
                     ),
                 )
 
@@ -342,7 +405,12 @@ class PolicyEngine:
 
         return None
 
-    def _evaluate_internal(self, proposal: ActionProposal) -> PolicyDecision:
+    def _evaluate_internal(
+        self,
+        proposal: ActionProposal,
+        footholds: list[FootholdEvidence] | None = None,
+        simulation_mode: bool = False,
+    ) -> PolicyDecision:
         # 1. Temporal Check
         now = datetime.now(UTC)
         expires_at = self.scope.expires_at
@@ -380,27 +448,9 @@ class PolicyEngine:
                 reason=f"Target IP {resolved_ip} is a loopback, link-local, or reserved address.",
             )
 
-        # Check containment in authorized subnets or host lists with DNS rebinding & wildcard support (S-02, L-02)
-        in_allowed_host_or_wildcard = False
-        for allowed in self._allowed_hosts_set:
-            if allowed == resolved_ip or allowed == proposal.target_host:
-                in_allowed_host_or_wildcard = True
-                break
-            if allowed.startswith("*."):
-                suffix = allowed[1:]
-                if proposal.target_host.endswith(suffix):
-                    in_allowed_host_or_wildcard = True
-                    break
-
+        # Network boundary check (allowed_subnets defines the permitted network envelope)
         in_allowed_subnet = any(ip_obj in subnet for subnet in self._parsed_subnets)
         in_allowed_ip = resolved_ip in self._allowed_hosts_set
-
-        # First verify the host identity is authorized (by name, explicit IP, or subnet)
-        if not (in_allowed_host_or_wildcard or in_allowed_subnet or in_allowed_ip):
-            return PolicyDecision(
-                approved=False,
-                reason=f"Target {proposal.target_host} ({resolved_ip}) is outside allowed targets.",
-            )
 
         if self._parsed_subnets:
             # When subnets are defined, resolved IP must be inside allowed subnets or explicitly allowed host IPs (S-02 DNS rebinding guard)
@@ -418,6 +468,79 @@ class PolicyEngine:
                     approved=False,
                     reason=f"Target '{proposal.target_host}' resolved to private IP {resolved_ip} without authorized private subnets.",
                 )
+
+        # Target authorization (Entry hosts vs Lateral Movement / Pivots)
+        in_allowed_host_or_wildcard = False
+        for allowed in self._allowed_hosts_set:
+            if allowed == resolved_ip or allowed == proposal.target_host:
+                in_allowed_host_or_wildcard = True
+                break
+            if allowed.startswith("*."):
+                suffix = allowed[1:]
+                if proposal.target_host.endswith(suffix):
+                    in_allowed_host_or_wildcard = True
+                    break
+
+        target_authorized = False
+        active_pivot: PivotRule | None = None
+
+        # Check explicit bounded multi-step chain authorization (L-04)
+        if self._is_chain_step(proposal):
+            chain_decision = self._evaluate_chain_authorization(proposal)
+            if chain_decision is not None:
+                return chain_decision
+            target_authorized = True
+        elif in_allowed_host_or_wildcard or in_allowed_ip:
+            target_authorized = True
+        elif self.scope.authorized_chain.enabled and self.scope.authorized_chain.pivots:
+            for pivot in self.scope.authorized_chain.pivots:
+                if pivot.to_host in (proposal.target_host, resolved_ip):
+                    if pivot.requires_foothold:
+                        now_utc = datetime.now(UTC)
+                        valid_fh = None
+                        for fh in (footholds or []):
+                            if fh.host == pivot.from_host and not fh.is_expired(now_utc):
+                                if not simulation_mode and fh.simulated:
+                                    continue
+                                if fh.assessment_id and self.scope.assessment_id and fh.assessment_id != self.scope.assessment_id:
+                                    continue
+                                valid_fh = fh
+                                break
+                        if not valid_fh:
+                            return PolicyDecision(
+                                approved=False,
+                                reason=(
+                                    f"Pivot target '{proposal.target_host}' requires verified foothold "
+                                    f"on '{pivot.from_host}', but none was found or evidence has expired."
+                                ),
+                            )
+                    if pivot.allowed_categories and proposal.action_category not in pivot.allowed_categories:
+                        return PolicyDecision(
+                            approved=False,
+                            reason=(
+                                f"Pivot rule to '{proposal.target_host}' restricts actions to "
+                                f"{pivot.allowed_categories}, but proposed category is '{proposal.action_category}'."
+                            ),
+                        )
+                    target_authorized = True
+                    active_pivot = pivot
+                    break
+            if not target_authorized:
+                return PolicyDecision(
+                    approved=False,
+                    reason=(
+                        f"Target '{proposal.target_host}' ({resolved_ip}) is not an authorized entry host "
+                        "and no matching pivot rule authorizes targeting it."
+                    ),
+                )
+        elif not self._allowed_hosts_set and not self.scope.authorized_chain.pivots and in_allowed_subnet:
+            # Legacy fallback: scope defined subnets but no explicit entry hosts or pivot rules
+            target_authorized = True
+        else:
+            return PolicyDecision(
+                approved=False,
+                reason=f"Target {proposal.target_host} ({resolved_ip}) is outside allowed targets.",
+            )
 
         # 3. Port Allowlist Check (S-01)
         effective_port = self._infer_target_port(proposal)
@@ -446,6 +569,11 @@ class PolicyEngine:
                     return PolicyDecision(
                         approved=False, reason=f"Port {port} is not in allowed ports."
                     )
+                if active_pivot and active_pivot.allowed_ports and port not in active_pivot.allowed_ports:
+                    return PolicyDecision(
+                        approved=False,
+                        reason=f"Port {port} is not permitted by pivot rule to '{proposal.target_host}' (allowed: {active_pivot.allowed_ports}).",
+                    )
         elif self.scope.ports.allowed_ports:
             # Fail closed: a scan without an explicit port set would use the
             # scanner's default range, which may leave the allowlist.
@@ -466,7 +594,9 @@ class PolicyEngine:
             )
 
         # 4. Embedded URL Argument Check (scope evasion defense)
-        embedded_decision = self._validate_embedded_targets(proposal)
+        embedded_decision = self._validate_embedded_targets(
+            proposal, footholds=footholds, simulation_mode=simulation_mode
+        )
         if embedded_decision is not None:
             return embedded_decision
 
@@ -586,16 +716,38 @@ class PolicyEngine:
         )
 
     def _resolve_host(self, host: str) -> str | None:
+        clean_host = host.strip("[]")
         # Fast path: already an IP literal
         try:
-            ipaddress.ip_address(host)
-            return host
+            ipaddress.ip_address(clean_host)
+            return clean_host
         except ValueError:
             pass
 
-        # Socket DNS resolution
+        # Socket DNS resolution (supporting IPv4 mock hooks and IPv6)
         try:
-            return socket.gethostbyname(host)
+            return socket.gethostbyname(clean_host)
+        except (OSError, socket.gaierror, socket.herror):
+            pass
+
+        try:
+            addr_info = socket.getaddrinfo(clean_host, None)
+            if not addr_info:
+                return None
+            for _, _, _, _, sockaddr in addr_info:
+                ip_str = str(sockaddr[0])
+                try:
+                    ip_obj = ipaddress.ip_address(ip_str)
+                    if (
+                        ip_obj.is_loopback
+                        or ip_obj.is_link_local
+                        or ip_obj.is_reserved
+                        or ip_obj.is_multicast
+                    ):
+                        return ip_str
+                except ValueError:
+                    continue
+            return str(addr_info[0][4][0])
         except (OSError, socket.gaierror, socket.herror):
             return None
 

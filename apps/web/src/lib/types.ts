@@ -93,6 +93,9 @@ export interface AssessmentDetail {
   };
   is_terminal: boolean;
   assessment_id?: string;
+  langfuse_trace_id?: string | null;
+  langfuse_session_id?: string | null;
+  langfuse_configured?: boolean;
 }
 
 export interface AssessmentEvent {

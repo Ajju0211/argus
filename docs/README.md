@@ -9,6 +9,8 @@ This directory contains the master requirements, architectural specifications, a
 | Document | Description |
 |---|---|
 | **[`PROJECT_EXPLAINED.md`](PROJECT_EXPLAINED.md)** | **Master System Walkthrough & Plain-English Guide:** Explains what ARGUS is, how it works from every perspective, what is currently live, how data flows, and how network redirection works. |
+| **[`BIFROST_TAVILY_MODEL_LOOP.md`](BIFROST_TAVILY_MODEL_LOOP.md)** | **Bifrost + Tavily Deep Dive:** How to connect LLM providers inside Bifrost, how models are selected, how Tavily is triggered, and exactly what happens inside each LangGraph loop iteration — including current implementation gaps and fixes. |
+| **[`BIFROST_AND_TAVILY_GUIDE.md`](BIFROST_AND_TAVILY_GUIDE.md)** | Operations guide for running and verifying the Bifrost gateway and Tavily integration across local and Docker environments. |
 | **[`ARGUS_Requirements_and_Build_Specification.md`](ARGUS_Requirements_and_Build_Specification.md)** | The comprehensive master specification for Geek Room / Global AI Hackathon 2026 (Track A: Challenge 03). Contains full functional requirements, compliance rules, risks, and roadmap. |
 | **[`ARGUS_MVP_ARCHITECTURE_SPEC.md`](ARGUS_MVP_ARCHITECTURE_SPEC.md)** | The architectural blueprint for the MVP: Ports-and-Adapters modular monolith, LangGraph state machine, data models, and 11-day build breakdown. |
 

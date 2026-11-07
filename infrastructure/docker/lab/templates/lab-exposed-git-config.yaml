@@ -1,0 +1,35 @@
+id: lab-exposed-git-config
+
+info:
+  name: ARGUS Lab - Exposed .git/config
+  author: argus-lab
+  severity: medium
+  description: |
+    The .git directory is served by the web root, exposing repository metadata
+    and remote URLs that may contain credentials.
+  reference:
+    - https://owasp.org/www-community/vulnerabilities/Information_exposure
+  classification:
+    cwe-id: CWE-538
+  tags: lab,exposure,git
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/.git/config"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - "[core]"
+          - "remote \"origin\""
+        condition: and
+    extractors:
+      - type: regex
+        part: body
+        regex:
+          - "url = .*"

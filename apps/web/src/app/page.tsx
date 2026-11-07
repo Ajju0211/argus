@@ -5,8 +5,9 @@ import Link from "next/link";
 import { PlusCircle, ShieldAlert, RefreshCw } from "lucide-react";
 import { KpiCardGrid } from "@/components/dashboard/KpiCardGrid";
 import { AssessmentsTable } from "@/components/dashboard/AssessmentsTable";
+import { DeleteAssessmentDialog } from "@/components/assessments/DeleteAssessmentDialog";
 import { AssessmentDetail } from "@/lib/types";
-import { listAssessments } from "@/lib/api";
+import { deleteAssessment, listAssessments } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -15,6 +16,9 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AssessmentDetail | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadAssessments = async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
@@ -37,6 +41,33 @@ export default function DashboardPage() {
     const interval = setInterval(() => loadAssessments(false), 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleDeleteAssessment = async () => {
+    if (!deleteTarget) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAssessment(deleteTarget.id);
+      setDeleteTarget(null);
+      await loadAssessments(false);
+    } catch (err: any) {
+      setDeleteError(err?.message || "Failed to delete assessment.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const requestDelete = (assessment: AssessmentDetail) => {
+    setDeleteError(null);
+    setDeleteTarget(assessment);
+  };
+
+  const closeDeleteDialog = () => {
+    if (isDeleting) return;
+    setDeleteTarget(null);
+    setDeleteError(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -89,7 +120,20 @@ export default function DashboardPage() {
       <KpiCardGrid assessments={assessments} />
 
       {/* Historical Runs Table */}
-      <AssessmentsTable assessments={assessments} />
+      <AssessmentsTable
+        assessments={assessments}
+        onDeleteRequest={requestDelete}
+        deletingId={isDeleting ? deleteTarget?.id ?? null : null}
+      />
+
+      <DeleteAssessmentDialog
+        open={deleteTarget !== null}
+        assessment={deleteTarget}
+        isDeleting={isDeleting}
+        error={deleteError}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteAssessment}
+      />
     </div>
   );
 }

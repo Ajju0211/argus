@@ -31,7 +31,9 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  # Authorized mock target lab for local testing
+  # Intentionally vulnerable mock target lab for local testing.
+  # Real Apache 2.4.49 with documented, verifiable findings. See
+  # infrastructure/docker/lab/KNOWN_VULNERABILITIES.md.
   mock-target-lab:
     build:
       context: .
@@ -39,11 +41,21 @@ services:
     container_name: argus-mock-target-lab
     restart: unless-stopped
     ports:
-      - "8888:8080"
+      - "127.0.0.1:8888:8080"
     networks:
       - argus-lab
+    # The app is deliberately exploitable, so the container itself is locked
+    # down as much as possible: read-only rootfs, no capabilities, non-root.
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 100
+    mem_limit: 1g
+    cpus: 1.0
 
   # FastAPI assessment orchestrator
   argus-api:
@@ -63,9 +75,14 @@ services:
       ARGUS_BIFROST_ADMIN_USERNAME: ${BIFROST_ADMIN_USERNAME:-${ARGUS_BIFROST_ADMIN_USERNAME:-}}
       ARGUS_BIFROST_ADMIN_PASSWORD: ${BIFROST_ADMIN_PASSWORD:-${ARGUS_BIFROST_ADMIN_PASSWORD:-}}
       ARGUS_BIFROST_BASE_URL: ${ARGUS_DOCKER_BIFROST_BASE_URL:-http://bifrost:8080/v1}
-      ARGUS_BIFROST_PRIMARY_MODEL: ${ARGUS_BIFROST_PRIMARY_MODEL:-claude-3-5-sonnet-20241022}
-      ARGUS_BIFROST_FALLBACK_MODEL: ${ARGUS_BIFROST_FALLBACK_MODEL:-gpt-4o}
+      ARGUS_BIFROST_PRIMARY_MODEL: ${ARGUS_BIFROST_PRIMARY_MODEL:-gpt-4o}
+      ARGUS_BIFROST_FALLBACK_MODEL: ${ARGUS_BIFROST_FALLBACK_MODEL:-groq/openai/gpt-oss-20b}
       ARGUS_TAVILY_API_KEY: ${ARGUS_TAVILY_API_KEY:-}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-${ARGUS_LANGFUSE_PUBLIC_KEY:-}}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-${ARGUS_LANGFUSE_SECRET_KEY:-}}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-${LANGFUSE_BASE_URL:-${ARGUS_LANGFUSE_HOST:-https://cloud.langfuse.com}}}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-${LANGFUSE_HOST:-${ARGUS_LANGFUSE_HOST:-https://cloud.langfuse.com}}}
+      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-${ARGUS_LANGFUSE_ENABLED:-true}}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -82,6 +99,11 @@ services:
       - argus-lab
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 200
+    mem_limit: 2g
+    cpus: 2.0
 
   # Next.js Cyber Command Dashboard
   argus-dashboard:
@@ -102,6 +124,11 @@ services:
       - argus-lab
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 100
+    mem_limit: 1g
+    cpus: 1.0
 
 networks:
   argus-lab:

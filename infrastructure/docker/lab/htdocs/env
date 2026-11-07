@@ -1,0 +1,12 @@
+# ARGUS MOCK LAB — FAKE SECRETS. These are not real credentials.
+APP_ENV=staging
+APP_DEBUG=true
+DB_HOST=lab-db.internal
+DB_PORT=5432
+DB_NAME=argus_lab
+DB_USER=labadmin
+DB_PASSWORD=SuperSecretLabPassword123!
+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+JWT_SECRET=lab-jwt-secret-do-not-use-in-production
+STRIPE_SECRET_KEY=mock_stripe_test_key_example

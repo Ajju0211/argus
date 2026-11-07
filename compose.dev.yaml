@@ -31,6 +31,7 @@ services:
       - ./apps:/app/apps
       - ./tests:/app/tests
       - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./.env:/app/.env:ro
       - argus-data:/app/data
       - argus-artifacts:/app/artifacts
 

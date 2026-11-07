@@ -3,6 +3,7 @@
 from integrations.bifrost import (
     BifrostAPIError,
     BifrostClient,
+    BifrostModelGateway,
     BifrostTelemetry,
     BifrostValidationError,
     create_bifrost_model_gateway,
@@ -19,6 +20,7 @@ from integrations.tools import (
 __all__ = [
     "BifrostAPIError",
     "BifrostClient",
+    "BifrostModelGateway",
     "BifrostTelemetry",
     "BifrostValidationError",
     "NmapAdapter",

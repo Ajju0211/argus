@@ -1,0 +1,35 @@
+id: lab-directory-listing
+
+info:
+  name: ARGUS Lab - Directory Listing Enabled
+  author: argus-lab
+  severity: medium
+  description: |
+    Apache autoindex is enabled on /backup/, allowing unauthenticated users to
+    enumerate backup files including a synthetic database dump.
+  reference:
+    - https://owasp.org/www-community/attacks/Directory_traversal
+  classification:
+    cwe-id: CWE-548
+  tags: lab,misconfig,listing
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/backup/"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - "Index of /backup"
+          - "db.sql"
+        condition: and
+    extractors:
+      - type: regex
+        part: body
+        regex:
+          - 'href="[^"]+"'

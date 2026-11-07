@@ -1,0 +1,28 @@
+id: lab-reflected-xss
+
+info:
+  name: ARGUS Lab - Reflected XSS in greet.sh
+  author: argus-lab
+  severity: medium
+  description: |
+    The "name" parameter of /cgi-bin/greet.sh is reflected into HTML without
+    output encoding, allowing script execution in a victim's browser.
+  reference:
+    - https://owasp.org/www-community/attacks/xss/
+  classification:
+    cwe-id: CWE-79
+  tags: lab,xss
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/cgi-bin/greet.sh?name=<script>alert(document.domain)</script>"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - "<script>alert(document.domain)</script>"

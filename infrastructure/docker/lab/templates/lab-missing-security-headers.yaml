@@ -1,0 +1,34 @@
+id: lab-missing-security-headers
+
+info:
+  name: ARGUS Lab - Missing HTTP Security Headers
+  author: argus-lab
+  severity: low
+  description: |
+    The application does not send Content-Security-Policy or X-Frame-Options
+    response headers, weakening browser-side protections.
+  reference:
+    - https://owasp.org/www-project-secure-headers/
+  classification:
+    cwe-id: CWE-693
+  tags: lab,misconfig,headers
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: header
+        words:
+          - "Content-Security-Policy"
+        negative: true
+      - type: word
+        part: header
+        words:
+          - "X-Frame-Options"
+        negative: true

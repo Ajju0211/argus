@@ -30,6 +30,34 @@ class AssessmentLimits(BaseModel):
     max_concurrency: int = Field(default=2, ge=1, le=10)
 
 
+class ScopeParseRequest(BaseModel):
+    """Payload for parsing arbitrary scope content without launching an assessment."""
+
+    file_content: str | None = Field(default=None, description="Raw scope file content or pasted text")
+    content: str | None = Field(default=None, description="Alias for file_content")
+    filename: str | None = Field(default=None, description="Optional filename for format hints")
+    content_type: str | None = Field(default=None, description="Optional MIME type")
+
+    @model_validator(mode="after")
+    def resolve_content(self) -> "ScopeParseRequest":
+        if not self.file_content and self.content:
+            self.file_content = self.content
+        return self
+
+
+class ScopeParseResponse(BaseModel):
+    """Standardized response from the deterministic scope parser (Spec 12)."""
+
+    is_valid: bool
+    scope_hash: str | None = None
+    format_detected: str = "UNKNOWN"
+    parsing_confidence: str = "DETERMINISTIC"
+    read_back: dict[str, Any] | None = None
+    normalized_yaml: str | None = None
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class AssessmentCreate(BaseModel):
     """Payload for launching or staging an authorized assessment."""
 
@@ -41,6 +69,16 @@ class AssessmentCreate(BaseModel):
         default=None, description="Authorized scope YAML text or an equivalent scope object"
     )
     scope_yaml: str | None = Field(default=None, description="Authorized scope YAML text")
+    scope_document: dict[str, Any] | None = Field(
+        default=None, description="Optional pre-parsed canonical ScopeDocument JSON payload"
+    )
+    imported_scope_hash: str | None = Field(
+        default=None, description="Cryptographic SHA-256 hash of pre-parsed scope"
+    )
+    auto_confirm: bool = Field(
+        default=False,
+        description="Whether to auto-authorize scope pre-flight (for automated CI/CD judging)",
+    )
     objective: str | dict[str, Any] = Field(
         default_factory=lambda: {"type": "discover_services", "required_hosts": 1}
     )
@@ -70,8 +108,8 @@ class AssessmentCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_inputs(self) -> "AssessmentCreate":
-        if not self.scope and not self.scope_yaml:
-            raise ValueError("Either 'scope' or 'scope_yaml' must be provided.")
+        if not self.scope and not self.scope_yaml and not self.scope_document:
+            raise ValueError("Either 'scope', 'scope_yaml', or 'scope_document' must be provided.")
         if self.limits is not None and self.max_iterations == 10:
             self.max_iterations = self.limits.max_iterations
         if not self.name:
@@ -111,6 +149,9 @@ class AssessmentDetail(BaseModel):
     telemetry: list[Any] = Field(default_factory=list)
     budget: dict[str, Any] = Field(default_factory=dict)
     is_terminal: bool = False
+    langfuse_trace_id: str | None = None
+    langfuse_session_id: str | None = None
+    langfuse_configured: bool = False
 
     @model_validator(mode="after")
     def sync_id_and_summary(self) -> "AssessmentDetail":

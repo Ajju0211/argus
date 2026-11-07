@@ -5,6 +5,7 @@ templates and parses line-delimited JSON (JSONL) outputs into typed observations
 """
 
 import json
+from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError, model_validator
@@ -20,6 +21,24 @@ class NucleiArgs(BaseToolArgs):
     template: str
     tags: str | None = None
     severity: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_keys(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            d = dict(data)
+            if "url" in d and "target" not in d and "target_url" not in d:
+                d["target"] = d["url"]
+            if "templates" in d and "template" not in d:
+                d["template"] = d["templates"]
+            tmpl = str(d.get("template", "")).strip()
+            if tmpl and not tmpl.endswith((".yaml", ".yml")):
+                if "apache" in tmpl.lower() or "41773" in tmpl.lower():
+                    d["template"] = "cve-2021-41773.yaml"
+                else:
+                    d["template"] = f"{tmpl}.yaml"
+            return d
+        return data
 
     @model_validator(mode="after")
     def validate_nuclei_params(self) -> "NucleiArgs":
@@ -68,6 +87,24 @@ class NucleiAdapter(ToolAdapter):
     @property
     def risk_level(self) -> str:
         return "MEDIUM"
+
+    def get_descriptor(self) -> dict[str, Any]:
+        """Advertises the pinned template names so the planner can pick one."""
+        descriptor = super().get_descriptor()
+        try:
+            templates = sorted(
+                path.name
+                for path in Path(self._templates_dir).iterdir()
+                if path.suffix in {".yaml", ".yml"}
+            )
+        except OSError:
+            templates = []
+        if templates:
+            descriptor["available_templates"] = templates
+            descriptor["template_argument_hint"] = (
+                "Set proposed_action.arguments.template to one of available_templates."
+            )
+        return descriptor
 
     def validate_args(self, args: dict[str, Any]) -> bool:
         """Validates Nuclei target URL and pinned template parameter against schema (X-04)."""

@@ -2,6 +2,8 @@
 
 This guide provides a comprehensive technical walkthrough of how **Maxim AI Bifrost** (LLM routing & failover gateway) and **Tavily Security Intelligence** (OSINT & CVE research) are integrated into **ARGUS**, how they interact with the LangGraph orchestrator, where to configure credentials, and how to operate them across development and production environments.
 
+> **Deeper dive:** For the exact provider-connection steps, the `provider/model` request contract, fallback behavior, per-iteration loop walkthrough, and a list of current implementation gaps, see **[`BIFROST_TAVILY_MODEL_LOOP.md`](BIFROST_TAVILY_MODEL_LOOP.md)**. That document is the authoritative reference for how model selection actually works in the code.
+
 ---
 
 ## Table of Contents
@@ -116,9 +118,10 @@ Located in [`integrations/bifrost/bifrost_client.py`](file:///Users/ajaysingh/Do
 
 ### Model Routing & Failover Mechanism
 Bifrost handles enterprise LLM resilience:
-* **Primary Model**: `claude-3-5-sonnet-20241022` (Anthropic). Handles deep reasoning, complex network topology planning, and precision vulnerability chaining.
-* **Fallback Model**: `gpt-4o` (OpenAI).
-* **Automatic Failover Behavior**: If the Anthropic API triggers a 429 rate limit, 500/503 server error, or connection timeout, Bifrost transparently re-routes the prompt to OpenAI GPT-4o without terminating the live assessment.
+* **Primary Model**: `anthropic/claude-3-5-sonnet-20241022`. Handles deep reasoning, complex network topology planning, and precision vulnerability chaining.
+* **Fallback Model**: `openai/gpt-4o`.
+* **Model ID format**: Bifrost uses provider-prefixed model IDs (`provider/model`). The prefix selects the upstream provider.
+* **Automatic Failover Behavior**: ARGUS sends the fallback as a `fallbacks` array in the request body. If the primary provider triggers a 429 rate limit, 5xx server error, or connection timeout, Bifrost re-routes the prompt to the next fallback without terminating the live assessment.
 
 ### Telemetry & Audit Logging
 Located in [`integrations/bifrost/telemetry.py`](file:///Users/ajaysingh/Documents/Open-source/argus/integrations/bifrost/telemetry.py):
@@ -199,8 +202,8 @@ OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxx
 # - Inside Docker: http://bifrost:8080/v1
 # - Local process: http://localhost:8080/v1
 ARGUS_BIFROST_BASE_URL=http://localhost:8080/v1
-ARGUS_BIFROST_PRIMARY_MODEL=claude-3-5-sonnet-20241022
-ARGUS_BIFROST_FALLBACK_MODEL=gpt-4o
+ARGUS_BIFROST_PRIMARY_MODEL=anthropic/claude-3-5-sonnet-20241022
+ARGUS_BIFROST_FALLBACK_MODEL=openai/gpt-4o
 
 # ==============================================================================
 # 2. TAVILY SECURITY INTELLIGENCE
@@ -293,14 +296,15 @@ If developing outside Docker:
    curl -i http://localhost:8080/v1/models \
      -H "Authorization: Bearer sk-bf-local"
    ```
-   *Expected Response*: HTTP 200 with JSON listing `claude-3-5-sonnet-20241022` and `gpt-4o`.
+   *Expected Response*: HTTP 200 with JSON listing the configured provider-prefixed models, e.g. `anthropic/claude-3-5-sonnet-20241022` and `openai/gpt-4o`.
 3. **Direct Chat Completion Test**:
    ```bash
    curl -X POST http://localhost:8080/v1/chat/completions \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer sk-bf-local" \
      -d '{
-       "model": "claude-3-5-sonnet-20241022",
+       "model": "anthropic/claude-3-5-sonnet-20241022",
+       "fallbacks": ["openai/gpt-4o"],
        "messages": [{"role": "user", "content": "ping"}]
      }'
    ```

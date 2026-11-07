@@ -4,13 +4,20 @@ Enforces zero out-of-scope executions and audits boundary conditions.
 Follows tdd-workflow and security-and-hardening guidelines.
 """
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from core.policy.policy_engine import PolicyEngine
 from core.scope.validator import ScopeValidator
-from packages.contracts import ActionProposal, ScopeDocument
+from packages.contracts import (
+    ActionProposal,
+    FootholdEvidence,
+    FootholdType,
+    PivotRule,
+    ScopeDocument,
+)
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
@@ -84,8 +91,9 @@ class TestPolicyEngineFirewall:
         assert "authorized" in decision.reason.lower()
         assert decision.resolved_ip == "192.168.100.5"
 
-    def test_authorized_subnet_ip_approved(self, policy_engine: PolicyEngine) -> None:
-        # 192.168.100.6 is within 192.168.100.0/28 (ranges .0 - .15)
+    def test_unlisted_subnet_ip_rejected_without_pivot(self, policy_engine: PolicyEngine) -> None:
+        # SEC-01: 192.168.100.6 is within 192.168.100.0/28, but not in entry_hosts/allowed_hosts.
+        # Subnet defines the network boundary, not direct target authorization.
         proposal = ActionProposal(
             action_id="act-002",
             target_host="192.168.100.6",
@@ -93,12 +101,12 @@ class TestPolicyEngineFirewall:
             tool_name="nmap",
             action_category="network_recon",
             arguments={},
-            rationale="Scanning permitted host in subnet",
-            expected_evidence="TCP port response",
+            rationale="Scanning unlisted host in subnet without pivot authorization",
+            expected_evidence="None",
         )
         decision = policy_engine.evaluate(proposal)
-        assert decision.approved is True
-        assert decision.resolved_ip == "192.168.100.6"
+        assert decision.approved is False
+        assert "outside allowed targets" in decision.reason.lower() or "pivot" in decision.reason.lower()
 
     def test_out_of_scope_ip_strictly_blocked(self, policy_engine: PolicyEngine) -> None:
         proposal = ActionProposal(
@@ -262,3 +270,80 @@ class TestPolicyEngineFirewall:
         decision = policy_engine.evaluate(proposal)
         assert decision.approved is False
         assert "cannot resolve" in decision.reason.lower()
+
+    def test_pivot_requires_foothold(self, valid_scope: ScopeDocument) -> None:
+        # Configure pivot from 192.168.100.5 to 192.168.100.10
+        scope_with_pivot = valid_scope.model_copy(
+            update={
+                "authorized_chain": valid_scope.authorized_chain.model_copy(
+                    update={
+                        "enabled": True,
+                        "pivots": [
+                            PivotRule(
+                                from_host="192.168.100.5",
+                                to_host="192.168.100.10",
+                                requires_foothold=True,
+                                allowed_categories=["network_recon"],
+                                allowed_ports=[80, 443],
+                            )
+                        ],
+                    }
+                )
+            }
+        )
+        engine = PolicyEngine(scope_with_pivot)
+
+        proposal = ActionProposal(
+            action_id="act-piv-01",
+            target_host="192.168.100.10",
+            target_port=80,
+            tool_name="nmap",
+            action_category="network_recon",
+            arguments={"ports": "80"},
+            rationale="Targeting internal host via pivot",
+            expected_evidence="Banner",
+        )
+
+        # 1. Denied without foothold
+        decision = engine.evaluate(proposal, footholds=[])
+        assert decision.approved is False
+        assert "requires verified foothold" in decision.reason
+
+        # 2. Approved with valid unexpired foothold
+        valid_fh = FootholdEvidence(
+            foothold_id="fh-001",
+            assessment_id=valid_scope.assessment_id,
+            host="192.168.100.5",
+            foothold_type=FootholdType.COMMAND_EXECUTION,
+            finding_id="fnd-001",
+            evidence_id="evi-001",
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            simulated=False,
+        )
+        decision = engine.evaluate(proposal, footholds=[valid_fh], simulation_mode=False)
+        assert decision.approved is True
+
+        # 3. Denied if foothold is expired
+        expired_fh = valid_fh.model_copy(
+            update={"expires_at": datetime.now(UTC) - timedelta(minutes=5)}
+        )
+        decision = engine.evaluate(proposal, footholds=[expired_fh], simulation_mode=False)
+        assert decision.approved is False
+        assert "requires verified foothold" in decision.reason
+
+        # 4. Denied if simulated foothold used in live run
+        sim_fh = valid_fh.model_copy(update={"simulated": True})
+        decision = engine.evaluate(proposal, footholds=[sim_fh], simulation_mode=False)
+        assert decision.approved is False
+
+        # 5. Approved if simulated foothold in simulation mode
+        decision = engine.evaluate(proposal, footholds=[sim_fh], simulation_mode=True)
+        assert decision.approved is True
+
+        # 6. Denied if port outside pivot allowed_ports
+        bad_port_proposal = proposal.model_copy(
+            update={"target_port": 8080, "arguments": {"ports": "8080"}}
+        )
+        decision = engine.evaluate(bad_port_proposal, footholds=[valid_fh], simulation_mode=False)
+        assert decision.approved is False
+        assert "not permitted by pivot rule" in decision.reason

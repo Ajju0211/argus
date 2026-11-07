@@ -6,10 +6,77 @@ the Deterministic Policy Engine, and the Tool Execution Engine.
 
 import hashlib
 import json
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class MinimumProofType(str, Enum):
+    """Threshold of verified evidence required to declare exploitation success."""
+
+    CODE_EXECUTION = "code_execution"  # Demonstrated command execution (whoami, id, uname)
+    DATA_EXPOSURE = "data_exposure"  # Arbitrary file read (/etc/passwd, db dumps, tokens)
+    AUTH_BYPASS = "auth_bypass"  # Verified privileged session token or admin login
+    SIMULATED_CANARY = "simulated_canary"  # Simulated probe canary confirmation (for air-gapped demo labs)
+
+
+class ExploitChainObjective(BaseModel):
+    """Specification for multi-step attack path and exploitation objectives."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    type: Literal["exploit_chain"] = "exploit_chain"
+    target_asset: str | None = Field(
+        default=None, description="Primary asset to demonstrate impact on"
+    )
+    minimum_proof: MinimumProofType = Field(
+        default=MinimumProofType.DATA_EXPOSURE,
+        description="Minimum cryptographic proof required to confirm impact",
+    )
+    allow_pivoting: bool = Field(
+        default=False,
+        description="Whether multi-host lateral movement is authorized (enforces chain.enabled)",
+    )
+    max_chain_depth: int = Field(default=3, ge=1, le=5, description="Maximum chained attack steps")
+    flag_pattern: str | None = Field(
+        default=None, description="Optional CTF flag regex pattern, e.g. flag{...}"
+    )
+
+
+class FootholdType(str, Enum):
+    """Mechanisms of demonstrated access that can unlock a pivot edge."""
+
+    VERIFIED_CREDENTIAL = "VERIFIED_CREDENTIAL"  # Validated login (SSH/DB/HTTP auth)
+    COMMAND_EXECUTION = "COMMAND_EXECUTION"  # Confirmed RCE / non-destructive command token
+    NETWORK_TUNNEL = "NETWORK_TUNNEL"  # Active SOCKS/HTTP forwarder established
+
+
+class FootholdEvidence(BaseModel):
+    """Cryptographic proof of active compromise required to traverse a pivot edge."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    foothold_id: str = Field(..., description="Unique foothold identifier (e.g. fh-20261106-001)")
+    assessment_id: str = Field(..., description="Owning assessment; footholds cannot cross assessments")
+    host: str = Field(..., description="IP or hostname where foothold is established")
+    foothold_type: FootholdType = Field(..., description="Class of operational access achieved")
+    finding_id: str = Field(..., description="Parent confirmed finding proving root vulnerability")
+    evidence_id: str = Field(..., description="SHA-256 evidence artifact proving validity of access")
+    established_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime = Field(..., description="TTL after which foothold must be re-validated")
+    simulated: bool = Field(default=False, description="Taint flag: simulated footholds cannot unlock live pivots")
+    details: dict[str, Any] = Field(default_factory=dict, description="Redacted access parameters")
+
+    def is_expired(self, current_time: datetime | None = None) -> bool:
+        now = current_time or datetime.now(UTC)
+        exp = (
+            self.expires_at
+            if self.expires_at.tzinfo is not None
+            else self.expires_at.replace(tzinfo=UTC)
+        )
+        return now > exp
 
 
 class ActionProposal(BaseModel):

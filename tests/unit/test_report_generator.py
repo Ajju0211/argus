@@ -390,3 +390,22 @@ allowed_ports: ["8080-8081"]
     assert "`8080`" in report
     assert "`8081`" in report
     assert "network_recon" in report
+
+
+def test_report_scope_compliance_boundary_attestation() -> None:
+    state = _state("ev-1", "0" * 64)
+    state["blocked_actions"] = [
+        {
+            "action_id": "act-blocked-01",
+            "target_host": "192.168.100.1",
+            "target_port": 80,
+            "tool_name": "nmap",
+            "denied_reason": "Host 192.168.100.1 is explicitly denied.",
+        }
+    ]
+    report = ReportGenerator().generate_markdown_report(state, evidence_vault=None)
+    assert "### 1.1 Scope Compliance & Active Boundary Attestation" in report
+    assert "Intercepted Out-of-Scope Actions" in report
+    assert "act-blocked-01" in report
+    assert "192.168.100.1" in report
+    assert "explicitly denied" in report

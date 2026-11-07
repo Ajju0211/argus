@@ -5,6 +5,9 @@ import hashlib
 import json
 import logging
 import re
+import shutil
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -12,7 +15,7 @@ from uuid import uuid4
 logger = logging.getLogger(__name__)
 
 import yaml
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -25,18 +28,47 @@ from apps.api.models import (
     StatusResponse,
 )
 from core.evidence.evidence_vault import EvidenceVault
+from core.executor.process_runner import terminate_active_processes
 from core.reporting.report_generator import ReportGenerator
 from core.scope.validator import ScopeValidator
 from engine.graph import create_initial_state
+from integrations.langfuse import LangfuseTracer
 from packages.contracts.findings import Finding
-from packages.contracts.scope import normalize_scope
+from packages.contracts.scope import compute_scope_hash, normalize_scope
 
-router = APIRouter(prefix="/api/v1/assessments", tags=["assessments"])
+
+def verify_api_key(request: Request) -> str:
+    """Authenticates API requests against configured ARGUS_API_KEY (SEC-05)."""
+    settings = getattr(request.app.state, "settings", None)
+    configured_key = (getattr(settings, "API_KEY", "") or "").strip()
+    if not configured_key:
+        return "default_operator"
+
+    auth_header = request.headers.get("authorization", "")
+    token = ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+    elif "x-api-key" in request.headers:
+        token = request.headers["x-api-key"].strip()
+
+    if not token or token != configured_key:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API authorization token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return "operator"
+
 
 _SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9_\-]+$")
-
-
 HTTP_422 = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", 422)
+
+
+router = APIRouter(
+    prefix="/api/v1/assessments",
+    tags=["assessments"],
+    dependencies=[Depends(verify_api_key)],
+)
 
 
 def _summary(record: dict[str, Any], request: Request) -> AssessmentDetail:
@@ -63,6 +95,10 @@ def _summary(record: dict[str, Any], request: Request) -> AssessmentDetail:
     objective_data = record.get("objective") or "discover_services"
 
     findings = state.get("findings", [])
+    if not findings:
+        db = getattr(request.app.state, "db", None)
+        if db:
+            findings = db.get_findings(assessment_id) or []
     total_findings = len(findings)
 
     return AssessmentDetail(
@@ -94,11 +130,18 @@ def _summary(record: dict[str, Any], request: Request) -> AssessmentDetail:
         budget=state.get("budget", {}),
         is_terminal=record["status"] in TERMINAL_STATUSES,
         assessment_id=assessment_id,
+        langfuse_trace_id=record.get("langfuse_trace_id"),
+        langfuse_session_id=record.get("langfuse_session_id"),
+        langfuse_configured=LangfuseTracer().is_enabled,
     )
 
 
 def _parse_scope(payload: AssessmentCreate) -> tuple[Any, str]:
-    scope_input = payload.scope_yaml if payload.scope_yaml is not None else payload.scope
+    scope_input = (
+        payload.scope_yaml
+        if payload.scope_yaml is not None
+        else (payload.scope if payload.scope is not None else payload.scope_document)
+    )
     if scope_input is None:
         raise HTTPException(
             status_code=HTTP_422,
@@ -111,7 +154,7 @@ def _parse_scope(payload: AssessmentCreate) -> tuple[Any, str]:
             scope = ScopeValidator.parse_yaml_string(scope_raw)
         else:
             scope = normalize_scope(scope_input)
-            scope_raw = yaml.safe_dump(scope_input, sort_keys=True)
+            scope_raw = yaml.safe_dump(scope.model_dump(mode="json"), sort_keys=True)
     except (ValueError, TypeError, yaml.YAMLError) as exc:
         raise HTTPException(
             status_code=HTTP_422,
@@ -127,12 +170,23 @@ def _parse_scope(payload: AssessmentCreate) -> tuple[Any, str]:
             status_code=status_code,
             detail=f"Scope rejected: {reason}",
         )
+
+    calculated_hash = compute_scope_hash(scope)
+    if payload.imported_scope_hash and payload.imported_scope_hash != calculated_hash:
+        raise HTTPException(
+            status_code=HTTP_422,
+            detail=(
+                f"Scope hash mismatch: imported_scope_hash '{payload.imported_scope_hash}' "
+                f"does not match calculated '{calculated_hash}'."
+            ),
+        )
+
     return scope, scope_raw
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=AssessmentDetail)
 def create_assessment(payload: AssessmentCreate, request: Request) -> AssessmentDetail:
-    """Create assessment & validate scope (Spec 06). Stages as READY or auto-launches."""
+    """Create assessment & validate scope (Spec 06 / Spec 12). Stages as READY or auto-launches."""
     app = request.app
     settings = app.state.settings
     simulation = (
@@ -149,6 +203,7 @@ def create_assessment(payload: AssessmentCreate, request: Request) -> Assessment
 
     scope, scope_raw = _parse_scope(payload)
     assessment_id = f"asm-{uuid4().hex[:12]}"
+    scope_hash = compute_scope_hash(scope)
 
     if isinstance(payload.target, AssessmentTarget):
         target = payload.target.model_dump(mode="json")
@@ -163,6 +218,16 @@ def create_assessment(payload: AssessmentCreate, request: Request) -> Assessment
         else {"type": "discover_services"}
     )
 
+    tracer = LangfuseTracer()
+    lf_trace_id = None
+    lf_session_id = None
+    if tracer.is_enabled:
+        lf_session_id = assessment_id
+        try:
+            lf_trace_id = tracer.client.create_trace_id()
+        except Exception:
+            lf_trace_id = None
+
     database.create(
         assessment_id,
         name=payload.name or f"Assessment-{target.get('value')}",
@@ -173,6 +238,8 @@ def create_assessment(payload: AssessmentCreate, request: Request) -> Assessment
         scope_raw=scope_raw,
         simulation=simulation,
         max_iterations=payload.max_iterations,
+        langfuse_trace_id=lf_trace_id,
+        langfuse_session_id=lf_session_id,
     )
     database.append_event(
         assessment_id,
@@ -183,8 +250,25 @@ def create_assessment(payload: AssessmentCreate, request: Request) -> Assessment
             "simulation": simulation,
             "max_iterations": payload.max_iterations,
             "status": initial_status,
+            "scope_hash": scope_hash,
         },
     )
+
+    # Spec 12 Pre-Flight Invariant: commit scope_confirmed audit event on auto_confirm or auto_start
+    if payload.auto_confirm or payload.auto_start:
+        confirmed_by = (
+            "cli_flag_auto_confirm" if payload.auto_confirm else "auto_start_implicit"
+        )
+        database.append_event(
+            assessment_id,
+            "scope_confirmed",
+            data={
+                "confirmed_at": datetime.now(UTC).isoformat(),
+                "confirmed_by": confirmed_by,
+                "scope_hash": scope_hash,
+                "auto_confirm": payload.auto_confirm,
+            },
+        )
 
     if payload.auto_start:
         app.state.runner.launch(
@@ -218,6 +302,81 @@ def get_assessment(assessment_id: str, request: Request) -> AssessmentDetail:
     return _summary(record, request)
 
 
+@router.delete("/{assessment_id}", response_model=StatusResponse)
+def delete_assessment(assessment_id: str, request: Request) -> StatusResponse:
+    """Permanently delete an assessment, its evidence artifacts, and all related records."""
+    if not _SAFE_ID_RE.match(assessment_id):
+        raise HTTPException(status_code=400, detail="Invalid assessment_id")
+
+    app = request.app
+    database = app.state.db
+    record = database.get(assessment_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+
+    # Stop active work first so the worker cannot write after the hard delete.
+    if record["status"] not in TERMINAL_STATUSES:
+        database.request_cancel(assessment_id)
+        terminate_active_processes(assessment_id)
+        runner = getattr(app.state, "runner", None)
+        if runner is not None:
+            deadline = time.monotonic() + 5.0
+            while runner.is_active(assessment_id) and time.monotonic() < deadline:
+                time.sleep(0.05)
+            if runner.is_active(assessment_id):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Assessment cancellation is still in progress. "
+                        "Please retry deletion in a moment."
+                    ),
+                )
+
+    artifacts_dir = Path(app.state.artifacts_dir).resolve()
+    assessment_dir = (artifacts_dir / assessment_id).resolve()
+    if not assessment_dir.is_relative_to(artifacts_dir):
+        raise HTTPException(status_code=400, detail="Invalid assessment artifact path")
+
+    if not database.delete_assessment(assessment_id):
+        raise HTTPException(status_code=404, detail="Assessment not found")
+
+    if assessment_dir.is_dir():
+        shutil.rmtree(assessment_dir)
+
+    return StatusResponse(status="DELETED")
+
+
+@router.post("/{assessment_id}/confirm", response_model=StatusResponse)
+def confirm_scope(
+    assessment_id: str, request: Request, payload: dict[str, Any] | None = None
+) -> StatusResponse:
+    """Pre-flight operator authorization confirming the parsed scope (Spec 12)."""
+    app = request.app
+    database = app.state.db
+    record = database.get(assessment_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+
+    scope = normalize_scope(record["scope"])
+    is_valid, reason = ScopeValidator.validate_scope_document(scope)
+    if not valid:
+        raise HTTPException(status_code=422, detail=f"Cannot confirm invalid scope: {reason}")
+
+    scope_hash = compute_scope_hash(scope)
+    operator = (payload or {}).get("confirmed_by") or "operator"
+    database.append_event(
+        assessment_id,
+        "scope_confirmed",
+        data={
+            "confirmed_at": datetime.now(UTC).isoformat(),
+            "confirmed_by": operator,
+            "scope_hash": scope_hash,
+        },
+    )
+    database.update_assessment(assessment_id, status="READY")
+    return StatusResponse(status="READY")
+
+
 @router.post("/{assessment_id}/start", response_model=StatusResponse)
 def start_assessment(assessment_id: str, request: Request) -> StatusResponse:
     """Launch LangGraph agent runner from READY or QUEUED state (Spec 06)."""
@@ -234,6 +393,24 @@ def start_assessment(assessment_id: str, request: Request) -> StatusResponse:
         raise HTTPException(status_code=400, detail="Cannot start a completed assessment")
 
     scope = normalize_scope(record["scope"])
+    is_valid, reason = ScopeValidator.validate_scope_document(scope)
+    if not is_valid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot start assessment: {reason}",
+        )
+
+    scope_hash = compute_scope_hash(scope)
+    database.append_event(
+        assessment_id,
+        "scope_confirmed",
+        data={
+            "confirmed_at": datetime.now(UTC).isoformat(),
+            "confirmed_by": "operator",
+            "scope_hash": scope_hash,
+        },
+    )
+
     target = record["target"]
     objective = record["objective"]
     obj_dict = objective if isinstance(objective, dict) else {"type": str(objective)}
@@ -340,6 +517,24 @@ def resume_assessment(assessment_id: str, request: Request) -> StatusResponse:
         checkpoint_state = record.get("state")
 
     scope = normalize_scope(record["scope"])
+    is_valid, reason = ScopeValidator.validate_scope_document(scope)
+    if not is_valid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot resume assessment: {reason}",
+        )
+
+    # Verify scope hash consistency between checkpoint and current scope
+    current_scope_raw = record.get("scope_raw", "")
+    current_scope_hash = hashlib.sha256(current_scope_raw.encode("utf-8")).hexdigest()
+    if isinstance(checkpoint_state, dict):
+        saved_scope_hash = checkpoint_state.get("scope_snapshot_hash") or checkpoint_state.get("scope_hash")
+        if saved_scope_hash and saved_scope_hash != current_scope_hash:
+            raise HTTPException(
+                status_code=400,
+                detail="Scope hash mismatch: authorized scope was modified while assessment was paused.",
+            )
+
     target = record["target"]
     objective = record["objective"]
     obj_dict = objective if isinstance(objective, dict) else {"type": str(objective)}
@@ -374,10 +569,11 @@ def cancel_assessment(assessment_id: str, request: Request) -> StatusResponse:
         return StatusResponse(status="CANCELLED")
 
     database.request_cancel(assessment_id)
+    terminate_active_processes(assessment_id)
     database.append_event(
         assessment_id,
         "cancel_requested",
-        data={"message": "Cancellation requested by user."},
+        data={"message": "Cancellation requested by user. Active tool processes terminated."},
     )
     return StatusResponse(status="CANCELLED")
 
@@ -395,6 +591,14 @@ async def stream_assessment_events(assessment_id: str, request: Request) -> Stre
         last_event_id = int(request.headers.get("last-event-id", "0") or "0")
     except ValueError:
         last_event_id = 0
+    # Browsers resend Last-Event-ID automatically, but an explicit query
+    # parameter lets a fresh client (or a REST replay) resume from a cursor.
+    query_cursor = request.query_params.get("last_event_id")
+    if query_cursor:
+        try:
+            last_event_id = max(last_event_id, int(query_cursor))
+        except ValueError:
+            pass
 
     async def event_generator() -> Any:
         cursor = last_event_id
@@ -403,12 +607,22 @@ async def stream_assessment_events(assessment_id: str, request: Request) -> Stre
             events = await run_in_threadpool(database.events_after, assessment_id, cursor)
             for event in events:
                 cursor = event["id"]
-                payload = json.dumps(event["data"], default=str)
+                event_data = event.get("data")
+                payload_obj: dict[str, Any] = (
+                    dict(event_data) if isinstance(event_data, dict) else {"value": event_data}
+                )
+                # Enrich every event with routing/telemetry metadata so the
+                # dashboard can show the exact pipeline step and event time.
+                payload_obj.setdefault("node", event["node"])
+                payload_obj.setdefault("timestamp", event["created_at"])
+                payload_obj.setdefault("event_id", event["id"])
+                payload = json.dumps(payload_obj, default=str)
                 yield f"id: {cursor}\nevent: {event['event_type']}\ndata: {payload}\n\n"
             current = await run_in_threadpool(database.get, assessment_id)
             if current is None:
                 break
             if current["status"] in TERMINAL_STATUSES and not events:
+                yield f"event: stream_closed\ndata: {json.dumps({'status': current['status'], 'is_terminal': True})}\n\n"
                 break
             if await request.is_disconnected():
                 break
@@ -418,8 +632,9 @@ async def stream_assessment_events(assessment_id: str, request: Request) -> Stre
                 yield ": heartbeat\n\n"
             await asyncio.sleep(0.5)
 
+    from typing import cast
     return StreamingResponse(
-        event_generator(),
+        cast(Any, event_generator()),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

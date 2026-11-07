@@ -21,6 +21,16 @@ class ZapArgs(BaseToolArgs):
     report_path: str | None = None
     max_crawl_minutes: int = 5
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_zap_keys(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            d = dict(data)
+            if "url" in d and "target" not in d and "target_url" not in d:
+                d["target"] = d["url"]
+            return d
+        return data
+
     @model_validator(mode="after")
     def validate_zap_params(self) -> "ZapArgs":
         target = (self.target or self.target_url or "").strip()

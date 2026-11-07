@@ -43,7 +43,9 @@ CREATE TABLE IF NOT EXISTS assessments (
     report_path_pdf TEXT,
     state_json TEXT,
     cancel_requested INTEGER NOT NULL DEFAULT 0,
-    pause_requested INTEGER NOT NULL DEFAULT 0
+    pause_requested INTEGER NOT NULL DEFAULT 0,
+    langfuse_trace_id TEXT,
+    langfuse_session_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -150,6 +152,8 @@ class Database:
                 ("objective", "TEXT NOT NULL DEFAULT ''"),
                 ("scope_yaml", "TEXT NOT NULL DEFAULT ''"),
                 ("pause_requested", "INTEGER NOT NULL DEFAULT 0"),
+                ("langfuse_trace_id", "TEXT"),
+                ("langfuse_session_id", "TEXT"),
             ]:
                 if col not in existing_cols:
                     connection.execute(f"ALTER TABLE assessments ADD COLUMN {col} {col_def}")
@@ -169,6 +173,8 @@ class Database:
         scope_raw: str,
         simulation: bool,
         max_iterations: int,
+        langfuse_trace_id: str | None = None,
+        langfuse_session_id: str | None = None,
     ) -> None:
         now = _now()
         target_type = target.get("type", "web")
@@ -186,8 +192,9 @@ class Database:
                     target_type, target_value, target_json,
                     objective, objective_json,
                     scope_yaml, scope_json, scope_raw,
-                    simulation, max_iterations
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    simulation, max_iterations,
+                    langfuse_trace_id, langfuse_session_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     assessment_id,
@@ -205,6 +212,8 @@ class Database:
                     scope_raw,
                     int(simulation),
                     max_iterations,
+                    langfuse_trace_id,
+                    langfuse_session_id,
                 ),
             )
 
@@ -222,6 +231,8 @@ class Database:
             "completed_at",
             "cancel_requested",
             "pause_requested",
+            "langfuse_trace_id",
+            "langfuse_session_id",
         }
         unknown = set(fields) - allowed
         if unknown:
@@ -249,6 +260,25 @@ class Database:
                 "SELECT * FROM assessments ORDER BY created_at DESC LIMIT ?", (limit,)
             ).fetchall()
         return [self._row_to_dict(row) for row in rows]
+
+    def delete_assessment(self, assessment_id: str) -> bool:
+        """Hard-delete an assessment and every persisted child record."""
+        child_tables = (
+            "events",
+            "assessment_events",
+            "findings",
+            "evidence_artifacts",
+            "graph_checkpoints",
+        )
+        with self._connect() as connection:
+            for table in child_tables:
+                connection.execute(
+                    f"DELETE FROM {table} WHERE assessment_id = ?", (assessment_id,)
+                )
+            cursor = connection.execute(
+                "DELETE FROM assessments WHERE id = ?", (assessment_id,)
+            )
+            return cursor.rowcount > 0
 
     @staticmethod
     def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:

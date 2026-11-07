@@ -215,6 +215,74 @@ class ReportGenerator:
         lines.append("")
         return lines
 
+    def _render_boundary_attestation(
+        self,
+        state: dict[str, Any],
+        vault: EvidenceVault | None = None,
+    ) -> list[str]:
+        blocked = state.get("blocked_actions", [])
+        executed = state.get("executed_actions", [])
+        total_eval = len(executed) + len(blocked)
+
+        ledger_root = "N/A"
+        tree_size = 0
+        if vault is not None:
+            ledger_path = Path(vault.base_dir) / _text(state.get("assessment_id")) / "ledger.jsonl"
+            if ledger_path.exists():
+                import contextlib
+
+                with contextlib.suppress(OSError, ValueError, KeyError):
+                    from core.evidence.ledger import AssessmentLedger
+
+                    ledger = AssessmentLedger(ledger_path, _text(state.get("assessment_id")))
+                    head = ledger.head()
+                    ledger_root = head.get("root_hash", "N/A")
+                    tree_size = head.get("tree_size", 0)
+
+        lines = [
+            "### 1.1 Scope Compliance & Active Boundary Attestation",
+            "",
+            (
+                "ARGUS enforces an active, deterministic policy boundary outside the LLM. "
+                "Every proposed action must satisfy the authorized scope before execution. "
+                "Policy interceptions and executions are cryptographically recorded in an append-only Merkle ledger."
+            ),
+            "",
+            f"- Total actions evaluated: **{total_eval}**",
+            f"- Authorized actions executed: **{len(executed)}**",
+            f"- Intercepted / blocked out-of-scope actions: **{len(blocked)}**",
+            f"- Merkle ledger tree size: **{tree_size}**",
+            f"- Merkle root hash: `{ledger_root}`",
+            "",
+        ]
+
+        if blocked:
+            lines.extend(
+                [
+                    "#### Intercepted Out-of-Scope Actions",
+                    "",
+                    "| Action ID | Target Host | Port | Tool | Reason Intercepted |",
+                    "|---|---|---|---|---|",
+                ]
+            )
+            for item in blocked:
+                aid = _cell(item.get("action_id"), "act-blocked")
+                thost = _cell(item.get("target_host"), "unknown")
+                tport = _cell(item.get("target_port"), "—")
+                tool = _cell(item.get("tool_name"), "—")
+                reason = _cell(
+                    item.get("denied_reason") or item.get("reject_reason"), "Out of scope"
+                )
+                lines.append(f"| {aid} | {thost} | {tport} | {tool} | {reason} |")
+            lines.append("")
+        else:
+            lines.append(
+                "*Zero policy violations or out-of-scope actions attempted during this assessment.*"
+            )
+            lines.append("")
+
+        return lines
+
     def _render_scope(self, state: dict[str, Any], scope: ScopeDocument | None) -> list[str]:
         lines = [
             "## 2. Assessment Scope & Authorization",
@@ -343,9 +411,11 @@ class ReportGenerator:
         self,
         findings: list[dict[str, Any]],
         statuses: dict[str, tuple[str, str, str]],
+        simulated: bool = False,
     ) -> list[str]:
+        sec_title = "## 5. Simulated Findings (Simulation Mode)" if simulated else "## 5. Verified Findings"
         lines = [
-            "## 5. Verified Findings",
+            sec_title,
             "",
         ]
         if not findings:
@@ -380,7 +450,7 @@ class ReportGenerator:
                         str(index),
                         f"**{_cell(finding.get('severity'))}**",
                         _cell(_confidence(finding)),
-                        _cell(finding.get("title")),
+                        f"[SIMULATED] {_cell(finding.get('title'))}" if simulated else _cell(finding.get("title")),
                         _cell(cves or None),
                         _cell(finding.get("cvss") or finding.get("cvss_score")),
                         _cell(finding.get("verification_method")),
@@ -396,8 +466,10 @@ class ReportGenerator:
         self,
         findings: list[dict[str, Any]],
         statuses: dict[str, tuple[str, str, str]],
+        simulated: bool = False,
     ) -> list[str]:
-        lines = ["## 6. Detailed Findings", ""]
+        sec_title = "## 6. Detailed Findings (Simulation Mode)" if simulated else "## 6. Detailed Findings"
+        lines = [sec_title, ""]
         if not findings:
             lines.extend(["No detailed findings to report.", ""])
             return lines
@@ -406,9 +478,10 @@ class ReportGenerator:
             severity = _text(finding.get("severity"), "INFORMATIONAL").upper()
             confidence = _confidence(finding)
             title = _text(finding.get("title"), "Untitled finding")
+            disp_title = f"[SIMULATED] {title}" if simulated else title
             lines.extend(
                 [
-                    f"### 6.{index} [{severity}] {title}",
+                    f"### 6.{index} [{severity}] {disp_title}",
                     "",
                     f"- Finding ID: `{_text(finding.get('finding_id'), 'unknown')}`",
                     f"- Confidence: **{confidence}**",
@@ -730,11 +803,12 @@ class ReportGenerator:
         sections: list[str] = []
         sections.extend(self._render_header(state, simulated))
         sections.extend(self._render_executive_summary(state, findings, statuses))
+        sections.extend(self._render_boundary_attestation(state, evidence_vault))
         sections.extend(self._render_scope(state, scope))
         sections.extend(self._render_methodology(state))
         sections.extend(self._render_attack_surface(state))
-        sections.extend(self._render_findings_table(findings, statuses))
-        sections.extend(self._render_finding_details(findings, statuses))
+        sections.extend(self._render_findings_table(findings, statuses, simulated=simulated))
+        sections.extend(self._render_finding_details(findings, statuses, simulated=simulated))
         sections.extend(self._render_research(state))
         sections.extend(self._render_audit(state, statuses))
         sections.extend(self._render_limitations(state, simulated, statuses))

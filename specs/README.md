@@ -22,7 +22,8 @@ specs/
 ├── 08-testing-evaluation-and-labs.md      <- 15 mandatory test scenarios, Docker test labs & M1 resource constraints
 ├── 09-team-plan-and-milestones.md         <- 2-person build plan (Dev 1 vs Dev 2), 11-day schedule & submission checklist
 ├── 10-implementation-review-and-remediation-plan.md <- Implementation gaps, safety risks & prioritized remediation backlog
-└── 11-proof-carrying-findings-and-chain-of-custody.md <- Proposed innovation: Merkle ledger, Proof Capsules & offline verifier
+├── 11-proof-carrying-findings-and-chain-of-custody.md <- Proposed innovation: Merkle ledger, Proof Capsules & offline verifier
+└── 12-scope-ingestion-and-preflight-authorization.md <- Scope importer, multi-format intake, exploit objective & read-back
 ```
 
 ---
@@ -43,6 +44,7 @@ specs/
 | **[09: Milestones & Team](./09-team-plan-and-milestones.md)** | 11-day delivery roadmap, division of labor | Nov 4–15 Milestones, First 48-Hour Slice | Shared |
 | **[10: Review & Remediation](./10-implementation-review-and-remediation-plan.md)** | Implementation gaps, safety risks, prioritized work queue | P0/P1/P2 backlog, acceptance criteria | Shared |
 | **[11: Proof-Carrying Findings](./11-proof-carrying-findings-and-chain-of-custody.md)** | Proposed tamper-evident evidence ledger, Proof Capsules, offline verifier | Merkle proofs, T1/T2 attestation, Bifrost/Tavily provenance | Shared |
+| **[12: Scope Ingestion & Pre-Flight](./12-scope-ingestion-and-preflight-authorization.md)** | Multi-format intake (.yaml, .json, .md, .txt, paste), exploit objective, read-back screen & freeze | Fast deterministic parser, exploit_chain contract, SHA-256 lock | Dev 2 & Dev 1 |
 
 ---
 

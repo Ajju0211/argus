@@ -6,9 +6,9 @@ strict JSON parsing into typed Pydantic contracts, and telemetry accounting.
 """
 
 import base64
+import json
 import re
 import time
-from collections.abc import Callable
 from typing import Any, TypeVar
 
 import httpx
@@ -21,6 +21,8 @@ T = TypeVar("T", bound=BaseModel)
 
 # Regex to strip markdown code blocks if the LLM wraps JSON output
 MARKDOWN_JSON_REGEX = re.compile(r"^```(?:json)?\s*([\s\S]*?)\s*```$", re.MULTILINE)
+THINK_REGEX = re.compile(r"<think>[\s\S]*?</think>", re.DOTALL)
+FENCE_REGEX = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```")
 
 
 class BifrostAPIError(Exception):
@@ -44,8 +46,8 @@ class BifrostClient:
         self,
         api_key: str = "",
         base_url: str = "https://bifrost.maxim.ai/v1",
-        primary_model: str = "claude-3-5-sonnet-20241022",
-        fallback_model: str = "gpt-4o",
+        primary_model: str = "anthropic/claude-3-5-sonnet-20241022",
+        fallback_model: str = "openai/gpt-4o",
         timeout_seconds: float = 60.0,
         transport: httpx.AsyncBaseTransport | None = None,
         admin_username: str | None = None,
@@ -61,29 +63,53 @@ class BifrostClient:
         self.admin_password = (admin_password or "").strip()
 
     def get_auth_header(self) -> str:
-        """Constructs Authorization header using Basic Auth (admin username:password) or Bearer token."""
-        # 1. Explicit admin credentials (username:password)
+        """Constructs Authorization header using Bearer token (virtual key) or Basic Auth."""
+        # 1. Standard Bearer token (virtual key) takes precedence for inference API
+        if self.api_key:
+            if self.api_key.startswith("Basic ") or self.api_key.startswith("Bearer "):
+                return self.api_key
+            if ":" in self.api_key and not self.api_key.startswith("sk-"):
+                raw = self.api_key.encode("utf-8")
+                encoded = base64.b64encode(raw).decode("ascii")
+                return f"Basic {encoded}"
+            return f"Bearer {self.api_key}"
+
+        # 2. Explicit admin credentials (username:password) fallback
         if self.admin_username and self.admin_password:
             raw = f"{self.admin_username}:{self.admin_password}".encode("utf-8")
             encoded = base64.b64encode(raw).decode("ascii")
             return f"Basic {encoded}"
 
-        # 2. Raw Basic auth header already provided in api_key
-        if self.api_key.startswith("Basic "):
-            return self.api_key
-
-        # 3. Colon-separated username:password provided in api_key
-        if ":" in self.api_key and not self.api_key.startswith("sk-"):
-            raw = self.api_key.encode("utf-8")
-            encoded = base64.b64encode(raw).decode("ascii")
-            return f"Basic {encoded}"
-
-        # 4. Standard Bearer token (virtual key)
-        return f"Bearer {self.api_key}" if self.api_key else ""
+        return ""
 
     def _clean_json_content(self, raw_content: str) -> str:
-        """Removes markdown code fences and extraneous leading/trailing whitespace."""
-        stripped = raw_content.strip()
+        """Removes reasoning tokens, markdown code fences, and extra whitespace."""
+        stripped = THINK_REGEX.sub("", raw_content).strip()
+        try:
+            json.loads(stripped)
+            return stripped
+        except Exception:
+            pass
+
+        fence = FENCE_REGEX.search(stripped)
+        if fence:
+            candidate = fence.group(1).strip()
+            try:
+                json.loads(candidate)
+                return candidate
+            except Exception:
+                pass
+
+        start = stripped.find("{")
+        end = stripped.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            candidate = stripped[start : end + 1]
+            try:
+                json.loads(candidate)
+                return candidate
+            except Exception:
+                pass
+
         match = MARKDOWN_JSON_REGEX.match(stripped)
         if match:
             return match.group(1).strip()
@@ -119,16 +145,29 @@ class BifrostClient:
 
         headers: dict[str, str] = {
             "Authorization": auth_header,
-            "X-Bifrost-Fallback": self.fallback_model,
             "Content-Type": "application/json",
         }
-        if auth_header.startswith("Bearer "):
-            headers["x-bf-vk"] = self.api_key
+        if self.api_key and not self.api_key.startswith("Basic "):
+            raw_key = self.api_key[7:] if self.api_key.startswith("Bearer ") else self.api_key
+            headers["x-bf-vk"] = raw_key
 
         messages: list[dict[str, str]] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
+
+        # Inject JSON schema instructions into system prompt so any model adheres to the exact schema
+        schema_json = json.dumps(schema.model_json_schema(), indent=2)
+        schema_instruction = (
+            f"\n\nJSON SCHEMA INSTRUCTIONS:\n"
+            f"Your output MUST be a valid JSON object strictly conforming to the following JSON schema for {schema.__name__}:\n"
+            f"```json\n{schema_json}\n```\n"
+            f"Do not include any extra fields or commentary outside the JSON object."
+        )
+        if messages and messages[0]["role"] == "system":
+            messages[0]["content"] += schema_instruction
+        else:
+            messages.insert(0, {"role": "system", "content": schema_instruction.strip()})
 
         payload: dict[str, Any] = {
             "model": self.primary_model,
@@ -136,6 +175,10 @@ class BifrostClient:
             "response_format": {"type": "json_object"},
             "temperature": 0.1,  # Low temperature for deterministic security reasoning
         }
+        # Bifrost's documented failover contract is a `fallbacks` array of
+        # provider-prefixed model IDs in the request body.
+        if self.fallback_model and self.fallback_model != self.primary_model:
+            payload["fallbacks"] = [self.fallback_model]
 
         start_time = time.perf_counter()
         async with httpx.AsyncClient(
@@ -192,14 +235,29 @@ class BifrostClient:
         completion_tokens = usage.get("completion_tokens", 0)
         total_tokens = usage.get("total_tokens", prompt_tokens + completion_tokens)
 
-        provider_header = resp.headers.get("X-Bifrost-Provider", "anthropic").lower()
-        fallback_header = resp.headers.get("X-Bifrost-Fallback-Triggered", "false").lower()
-        fallback_triggered = fallback_header in ["true", "1", "yes"]
+        extra_fields = data.get("extra_fields") or {}
+        routing_info = (
+            extra_fields.get("routing_info") or {} if isinstance(extra_fields, dict) else {}
+        )
 
-        model_returned = data.get("model", self.primary_model)
+        provider_used = (
+            routing_info.get("provider")
+            or resp.headers.get("X-Bifrost-Provider")
+            or "unknown"
+        ).lower()
+
+        fallback_header = resp.headers.get("X-Bifrost-Fallback-Triggered")
+        if fallback_header is not None:
+            fallback_triggered = fallback_header.lower() in ["true", "1", "yes"]
+        else:
+            fallback_triggered = bool(routing_info.get("is_fallback", False))
+
+        model_returned = (
+            data.get("model") or routing_info.get("model") or self.primary_model
+        )
 
         telemetry = BifrostTelemetry(
-            provider_used=provider_header,
+            provider_used=provider_used,
             model_used=model_returned,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
@@ -211,18 +269,23 @@ class BifrostClient:
         return structured_obj, telemetry
 
 
-def create_bifrost_model_gateway(
-    client: BifrostClient,
-) -> Callable[[str], AssessmentDecision]:
-    """Wraps async Bifrost completion into a synchronous ModelGatewayCallable.
+class BifrostModelGateway:
+    """Synchronous Bifrost adapter that retains the latest call telemetry.
 
-    Enables the LangGraph Orchestrator to route all LLM planning decisions
-    through the Bifrost Gateway.
+    LangGraph nodes are synchronous, so this class bridges to the async
+    ``BifrostClient`` and exposes ``last_telemetry`` for the orchestrator to
+    persist into ``AssessmentState.telemetry`` and the final report.
     """
-    import asyncio
-    import concurrent.futures
 
-    def model_gateway(prompt: str) -> AssessmentDecision:
+    def __init__(self, client: BifrostClient) -> None:
+        self.client = client
+        self.last_telemetry: BifrostTelemetry | None = None
+
+    def __call__(self, prompt: str) -> AssessmentDecision:
+        import asyncio
+        import concurrent.futures
+
+        self.last_telemetry = None
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -230,14 +293,20 @@ def create_bifrost_model_gateway(
 
         if loop and loop.is_running():
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                decision, _telemetry = pool.submit(
-                    lambda: asyncio.run(client.complete_structured(prompt, AssessmentDecision))
+                decision, telemetry = pool.submit(
+                    lambda: asyncio.run(
+                        self.client.complete_structured(prompt, AssessmentDecision)
+                    )
                 ).result()
-                return decision
         else:
-            decision, _telemetry = asyncio.run(
-                client.complete_structured(prompt, AssessmentDecision)
+            decision, telemetry = asyncio.run(
+                self.client.complete_structured(prompt, AssessmentDecision)
             )
-            return decision
 
-    return model_gateway
+        self.last_telemetry = telemetry
+        return decision
+
+
+def create_bifrost_model_gateway(client: BifrostClient) -> BifrostModelGateway:
+    """Creates the synchronous model gateway used by the LangGraph orchestrator."""
+    return BifrostModelGateway(client)

@@ -10,7 +10,11 @@ from typing import Any
 import httpx
 import pytest
 
-from integrations.bifrost.bifrost_client import BifrostAPIError, BifrostClient
+from integrations.bifrost.bifrost_client import (
+    BifrostAPIError,
+    BifrostClient,
+    create_bifrost_model_gateway,
+)
 from integrations.bifrost.telemetry import BifrostTelemetry
 from packages.contracts.actions import (
     AssessmentDecision,
@@ -51,14 +55,15 @@ class TestBifrostClient:
         def handler(request: httpx.Request) -> httpx.Response:
             assert request.url.path == "/v1/chat/completions"
             assert request.headers.get("Authorization") == "Bearer test-bifrost-key"
-            assert request.headers.get("X-Bifrost-Fallback") == "gpt-4o"
+            assert request.headers.get("X-Bifrost-Fallback") is None
 
             body = json.loads(request.content.decode("utf-8"))
-            assert body["model"] == "claude-3-5-sonnet-20241022"
+            assert body["model"] == "anthropic/claude-3-5-sonnet-20241022"
+            assert body["fallbacks"] == ["openai/gpt-4o"]
 
             response_data: dict[str, Any] = {
                 "id": "chatcmpl-test-01",
-                "model": "claude-3-5-sonnet-20241022",
+                "model": "anthropic/claude-3-5-sonnet-20241022",
                 "choices": [
                     {
                         "message": {
@@ -72,6 +77,13 @@ class TestBifrostClient:
                     "prompt_tokens": 350,
                     "completion_tokens": 120,
                     "total_tokens": 470,
+                },
+                "extra_fields": {
+                    "routing_info": {
+                        "provider": "anthropic",
+                        "model": "anthropic/claude-3-5-sonnet-20241022",
+                        "is_fallback": False,
+                    }
                 },
             }
             headers = {
@@ -101,7 +113,7 @@ class TestBifrostClient:
         # Assert telemetry
         assert isinstance(telemetry, BifrostTelemetry)
         assert telemetry.provider_used == "anthropic"
-        assert telemetry.model_used == "claude-3-5-sonnet-20241022"
+        assert telemetry.model_used == "anthropic/claude-3-5-sonnet-20241022"
         assert telemetry.prompt_tokens == 350
         assert telemetry.completion_tokens == 120
         assert telemetry.total_tokens == 470
@@ -113,9 +125,13 @@ class TestBifrostClient:
         """Verifies automatic fallback to GPT-4o when primary provider experiences outage."""
 
         def handler(request: httpx.Request) -> httpx.Response:
+            body = json.loads(request.content.decode("utf-8"))
+            assert body["model"] == "anthropic/claude-3-5-sonnet-20241022"
+            assert body["fallbacks"] == ["openai/gpt-4o"]
+
             response_data: dict[str, Any] = {
                 "id": "chatcmpl-fallback-01",
-                "model": "gpt-4o",
+                "model": "openai/gpt-4o",
                 "choices": [
                     {
                         "message": {
@@ -129,6 +145,15 @@ class TestBifrostClient:
                     "prompt_tokens": 380,
                     "completion_tokens": 115,
                     "total_tokens": 495,
+                },
+                "extra_fields": {
+                    "routing_info": {
+                        "provider": "openai",
+                        "model": "openai/gpt-4o",
+                        "is_fallback": True,
+                        "primary_provider": "anthropic",
+                        "primary_model": "anthropic/claude-3-5-sonnet-20241022",
+                    }
                 },
             }
             # Bifrost returns response from secondary provider
@@ -151,8 +176,76 @@ class TestBifrostClient:
 
         assert decision.decision_type == DecisionType.EXECUTE_ACTION
         assert telemetry.provider_used == "openai"
-        assert telemetry.model_used == "gpt-4o"
+        assert telemetry.model_used == "openai/gpt-4o"
         assert telemetry.fallback_triggered is True
+
+    @pytest.mark.asyncio
+    async def test_routing_info_is_used_when_headers_are_absent(
+        self, sample_decision_json: str
+    ) -> None:
+        """Verifies routing_info drives provider/fallback telemetry without legacy headers."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "model": "openai/gpt-4o",
+                    "choices": [{"message": {"content": sample_decision_json}}],
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+                    "extra_fields": {
+                        "routing_info": {
+                            "provider": "openai",
+                            "model": "openai/gpt-4o",
+                            "is_fallback": True,
+                        }
+                    },
+                },
+            )
+
+        client = BifrostClient(
+            api_key="test-key",
+            transport=httpx.MockTransport(handler),
+        )
+        _, telemetry = await client.complete_structured(
+            prompt="plan", schema=AssessmentDecision
+        )
+
+        assert telemetry.provider_used == "openai"
+        assert telemetry.model_used == "openai/gpt-4o"
+        assert telemetry.fallback_triggered is True
+
+    def test_model_gateway_retains_last_telemetry(self, sample_decision_json: str) -> None:
+        """Verifies the synchronous gateway exposes telemetry for the orchestrator."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "model": "anthropic/claude-3-5-sonnet-20241022",
+                    "choices": [{"message": {"content": sample_decision_json}}],
+                    "usage": {"prompt_tokens": 12, "completion_tokens": 8},
+                    "extra_fields": {
+                        "routing_info": {
+                            "provider": "anthropic",
+                            "model": "anthropic/claude-3-5-sonnet-20241022",
+                            "is_fallback": False,
+                        }
+                    },
+                },
+            )
+
+        client = BifrostClient(
+            api_key="test-key",
+            transport=httpx.MockTransport(handler),
+        )
+        gateway = create_bifrost_model_gateway(client)
+
+        decision = gateway("plan")
+
+        assert decision.decision_type == DecisionType.EXECUTE_ACTION
+        assert gateway.last_telemetry is not None
+        assert gateway.last_telemetry.provider_used == "anthropic"
+        assert gateway.last_telemetry.total_tokens == 20
 
     @pytest.mark.asyncio
     async def test_markdown_fence_stripping(self, sample_decision_json: str) -> None:

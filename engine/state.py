@@ -79,11 +79,13 @@ class AssessmentState(TypedDict):
 
     # Knowledge Base & Topology
     discovered_assets: list[str]  # ["192.168.100.5", "lab-target.local"]
+    unauthorized_discovered_assets: list[str]  # Discovered hosts outside scope policy, segregated from planner
     discovered_services: list[
         dict[str, Any]
     ]  # [{"port": 8080, "service": "http", "version": "Apache 2.4.49"}]
     observations: list[dict[str, Any]]  # Normalized observation structures
     research_refs: list[dict[str, Any]]  # Tavily retrieved CVE intelligence & advisories
+    footholds: list[dict[str, Any]]  # Serialized FootholdEvidence list proving compromised source hosts
 
     # Planning & Audit History
     current_strategy: str  # INITIAL_RECON | SERVICE_ENUMERATION | CVE_VERIFICATION
@@ -104,6 +106,8 @@ class AssessmentState(TypedDict):
     report_markdown: str  # Final generated Markdown report (E-03)
     report_path: str | None  # On-disk report location, when written
     telemetry: list[dict[str, Any]]  # Bifrost provider/token/latency events
+    langfuse_trace_id: str | None
+    langfuse_session_id: str | None
 
     # Operational Controls & Budgets
     budget: dict[str, Any]  # Serialized ExecutionBudget

@@ -1,0 +1,30 @@
+id: lab-apache-server-status
+
+info:
+  name: ARGUS Lab - Public Apache server-status
+  author: argus-lab
+  severity: medium
+  description: |
+    Apache mod_status is exposed without authentication, disclosing active
+    requests, client addresses, and server internals.
+  reference:
+    - https://httpd.apache.org/docs/2.4/mod/mod_status.html
+  classification:
+    cwe-id: CWE-200
+  tags: lab,apache,exposure,misconfig
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/server-status"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - "Apache Server Status"
+          - "Server Version"
+        condition: and

@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------
     ENV: str = Field(default="development", description="development | test | production")
     LOG_LEVEL: str = Field(default="INFO", description="DEBUG | INFO | WARNING | ERROR")
+    API_KEY: str = Field(
+        default="", description="Operator API key for API endpoint authentication (SEC-05)"
+    )
     CORS_ORIGINS: list[str] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"],
         description="Allowed browser origins for the API (JSON list in ARGUS_CORS_ORIGINS)",
@@ -81,10 +84,12 @@ class Settings(BaseSettings):
         description="Self-hosted open-source Bifrost proxy base URL (http://localhost:8080/v1)",
     )
     BIFROST_PRIMARY_MODEL: str = Field(
-        default="claude-3-5-sonnet-20241022", description="Default high-intelligence primary model"
+        default="anthropic/claude-3-5-sonnet-20241022",
+        description="Provider-prefixed primary model (e.g. anthropic/claude-3-5-sonnet-20241022)",
     )
     BIFROST_FALLBACK_MODEL: str = Field(
-        default="gpt-4o", description="Secondary fallback model on provider outage"
+        default="openai/gpt-4o",
+        description="Provider-prefixed fallback model on provider outage (e.g. openai/gpt-4o)",
     )
 
     # -------------------------------------------------------------
@@ -92,6 +97,37 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------
     TAVILY_API_KEY: str = Field(
         default="", description="Tavily Search API Key for CVE & Advisory lookups"
+    )
+
+    # -------------------------------------------------------------
+    # Observability: Langfuse (Tracing, Metrics, Tool & AI Tracking)
+    # -------------------------------------------------------------
+    LANGFUSE_PUBLIC_KEY: str = Field(
+        default="",
+        validation_alias=AliasChoices("ARGUS_LANGFUSE_PUBLIC_KEY", "LANGFUSE_PUBLIC_KEY"),
+        description="Langfuse public key (pk-lf-...)",
+    )
+    LANGFUSE_SECRET_KEY: str = Field(
+        default="",
+        validation_alias=AliasChoices("ARGUS_LANGFUSE_SECRET_KEY", "LANGFUSE_SECRET_KEY"),
+        description="Langfuse secret key (sk-lf-...)",
+    )
+    LANGFUSE_HOST: str = Field(
+        default="https://cloud.langfuse.com",
+        validation_alias=AliasChoices(
+            "ARGUS_LANGFUSE_HOST",
+            "LANGFUSE_HOST",
+            "LANGFUSE_BASEURL",
+            "ARGUS_LANGFUSE_BASEURL",
+            "LANGFUSE_BASE_URL",
+            "ARGUS_LANGFUSE_BASE_URL",
+        ),
+        description="Langfuse host URL (e.g. https://cloud.langfuse.com or self-hosted endpoint)",
+    )
+    LANGFUSE_ENABLED: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("ARGUS_LANGFUSE_ENABLED", "LANGFUSE_ENABLED"),
+        description="Feature flag: Enable Langfuse tracing when credentials are present",
     )
 
     # -------------------------------------------------------------

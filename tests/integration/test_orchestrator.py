@@ -14,6 +14,7 @@ from core.scope.validator import ScopeValidator
 from engine.graph import AssessmentOrchestrator, create_initial_state
 from engine.recovery import compute_exponential_backoff
 from engine.state import CancellationState, ExecutionBudget
+from integrations.bifrost.telemetry import BifrostTelemetry
 from packages.contracts.actions import (
     ActionProposal,
     AssessmentDecision,
@@ -152,6 +153,52 @@ class TestAgentOrchestrator:
         # Duplicate action should be placed in blocked_actions
         assert len(plan_update.get("blocked_actions", [])) > 0
         assert "Duplicate action" in plan_update["blocked_actions"][0]["reject_reason"]
+
+    def test_plan_action_persists_bifrost_telemetry(
+        self,
+        valid_scope: ScopeDocument,
+        valid_scope_raw: str,
+        default_target: dict[str, Any],
+        default_objective: dict[str, Any],
+    ) -> None:
+        """Verifies model telemetry is appended to assessment state for reporting."""
+
+        class TelemetryGateway:
+            def __init__(self) -> None:
+                self.last_telemetry: BifrostTelemetry | None = None
+
+            def __call__(self, prompt: str) -> AssessmentDecision:
+                self.last_telemetry = BifrostTelemetry(
+                    provider_used="anthropic",
+                    model_used="anthropic/claude-3-5-sonnet-20241022",
+                    prompt_tokens=100,
+                    completion_tokens=20,
+                    total_tokens=120,
+                    latency_ms=250,
+                    fallback_triggered=False,
+                )
+                return AssessmentDecision(
+                    decision_type=DecisionType.OBJECTIVE_ACHIEVED,
+                    rationale="Objective satisfied in test.",
+                    completion_summary="Done.",
+                )
+
+        orchestrator = AssessmentOrchestrator(
+            scope=valid_scope, model_gateway=TelemetryGateway()
+        )
+        state = create_initial_state(
+            assessment_id="asm-telemetry",
+            target=default_target,
+            objective=default_objective,
+            scope=valid_scope,
+            scope_yaml_raw=valid_scope_raw,
+        )
+
+        update = orchestrator.plan_action_node(state)
+
+        assert update["telemetry"][0]["provider_used"] == "anthropic"
+        assert update["telemetry"][0]["model_used"] == "anthropic/claude-3-5-sonnet-20241022"
+        assert update["telemetry"][0]["total_tokens"] == 120
 
     def test_objective_completion_requires_verified_evidence(
         self, valid_scope: ScopeDocument, valid_scope_raw: str, default_target: dict[str, Any]

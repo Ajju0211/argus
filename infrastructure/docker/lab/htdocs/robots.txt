@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /backup/
+Disallow: /server-status
+Disallow: /.git/
+Disallow: /.env

@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   FileCode,
@@ -10,10 +10,12 @@ import {
   Check,
   Download,
   Lock,
+  Trash2,
 } from "lucide-react";
-import { getAssessment, getRawEvidence } from "@/lib/api";
+import { deleteAssessment, getAssessment, getRawEvidence } from "@/lib/api";
 import { AssessmentDetail } from "@/lib/types";
 import { truncateHash } from "@/lib/utils";
+import { DeleteAssessmentDialog } from "@/components/assessments/DeleteAssessmentDialog";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +27,7 @@ interface PageProps {
 export default function EvidenceVaultPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const assessmentId = resolvedParams.id;
   const initialFocus = searchParams.get("focus");
 
@@ -33,6 +36,9 @@ export default function EvidenceVaultPage({ params }: PageProps) {
   const [rawContent, setRawContent] = useState<string>("");
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     getAssessment(assessmentId).then((data) => {
@@ -72,6 +78,27 @@ export default function EvidenceVaultPage({ params }: PageProps) {
     URL.revokeObjectURL(url);
   };
 
+  const handleDeleteAssessment = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAssessment(assessmentId);
+      setIsDeleteDialogOpen(false);
+      router.push("/");
+      router.refresh();
+    } catch (err: any) {
+      setDeleteError(err?.message || "Failed to delete assessment.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const closeDeleteDialog = () => {
+    if (isDeleting) return;
+    setIsDeleteDialogOpen(false);
+    setDeleteError(null);
+  };
+
   const selectedRef = assessment?.evidence_refs?.find(
     (r) => (r.evidence_id || r.id) === selectedEvId
   );
@@ -96,13 +123,28 @@ export default function EvidenceVaultPage({ params }: PageProps) {
             <div>
               <CardTitle className="text-base sm:text-lg">Cryptographic Evidence Inspector</CardTitle>
               <CardDescription>
-                Zero-hallucination verification vault. Every confirmed vulnerability links directly to an immutable on-disk artifact.
+                Evidence-backed verification vault. Every confirmed vulnerability links directly to an immutable on-disk artifact.
               </CardDescription>
             </div>
-            <Badge variant="success" className="gap-1.5 w-fit">
-              <Lock className="h-3.5 w-3.5" />
-              Merkle Tamper-Evident Chain
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="success" className="gap-1.5 w-fit">
+                <Lock className="h-3.5 w-3.5" />
+                Merkle Tamper-Evident Chain
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setDeleteError(null);
+                  setIsDeleteDialogOpen(true);
+                }}
+                disabled={!assessment}
+                className="gap-1.5 h-7 text-xs text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Assessment &amp; Evidence</span>
+              </Button>
+            </div>
           </div>
         </CardHeader>
 
@@ -218,6 +260,15 @@ export default function EvidenceVaultPage({ params }: PageProps) {
           </div>
         </CardContent>
       </Card>
+
+      <DeleteAssessmentDialog
+        open={isDeleteDialogOpen}
+        assessment={assessment}
+        isDeleting={isDeleting}
+        error={deleteError}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteAssessment}
+      />
     </div>
   );
 }

@@ -36,15 +36,29 @@ class AssessmentLedger:
 
         results: list[dict[str, Any]] = []
         with open(self.ledger_file, "r", encoding="utf-8") as f:
-            for line_num, line in enumerate(f, start=1):
-                clean = line.strip()
-                if not clean:
-                    continue
+            try:
+                import fcntl
+
+                fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+            except (ImportError, OSError):
+                pass
+            try:
+                for line_num, line in enumerate(f, start=1):
+                    clean = line.strip()
+                    if not clean:
+                        continue
+                    try:
+                        record = json.loads(clean)
+                        results.append(record)
+                    except json.JSONDecodeError as exc:
+                        raise ValueError(f"Malformed JSON on line {line_num} in ledger: {exc}")
+            finally:
                 try:
-                    record = json.loads(clean)
-                    results.append(record)
-                except json.JSONDecodeError as exc:
-                    raise ValueError(f"Malformed JSON on line {line_num} in ledger: {exc}")
+                    import fcntl
+
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                except (ImportError, OSError):
+                    pass
         return results
 
     def build_tree(self) -> MerkleTree:
@@ -79,8 +93,9 @@ class AssessmentLedger:
         action_id: str = "",
         bifrost_metadata: dict[str, Any] | None = None,
         research_metadata: list[dict[str, Any]] | None = None,
+        denial_reason: str | None = None,
     ) -> tuple[int, MerkleTree, list[str]]:
-        """Appends an executor-attested record with monotonic seq.
+        """Appends an executor-attested or policy record with monotonic seq.
 
         Returns tuple of (seq, tree, inclusion_proof).
         """
@@ -111,20 +126,61 @@ class AssessmentLedger:
             "evidence_ids": list(evidence_ids or []),
         }
 
+        if denial_reason:
+            record["denial_reason"] = denial_reason
         if bifrost_metadata:
             record["bifrost"] = bifrost_metadata
         if research_metadata:
             record["research"] = research_metadata
 
-        # Append canonical line
+        # Append canonical line with exclusive file locking
         line = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         with open(self.ledger_file, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
+            try:
+                import fcntl
+
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            except (ImportError, OSError):
+                pass
+            try:
+                f.write(line + "\n")
+                f.flush()
+            finally:
+                try:
+                    import fcntl
+
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                except (ImportError, OSError):
+                    pass
 
         # Build updated tree and generate proof for this new leaf
         tree = self.build_tree()
         proof = tree.generate_inclusion_proof(seq)
         return seq, tree, proof
+
+    def append_policy_denial(
+        self,
+        action_id: str,
+        tool: str,
+        target_host: str,
+        target_port: int | None,
+        arguments: dict[str, Any] | Any,
+        reason: str,
+    ) -> tuple[int, MerkleTree, list[str]]:
+        """Appends a Tier-1 Policy Denial record to the immutable Merkle ledger (SEC-04)."""
+        return self.append_record(
+            event="policy_denial",
+            tool=tool,
+            target_host=target_host,
+            target_port=target_port,
+            arguments=arguments,
+            exit_code=-1,
+            stdout_raw="",
+            stderr_raw=f"POLICY_DENIED: {reason}",
+            tier="T1_POLICY",
+            action_id=action_id,
+            denial_reason=reason,
+        )
 
     def get_proof_for_evidence_id(self, evidence_id: str) -> dict[str, Any] | None:
         """Finds the ledger record containing evidence_id and returns its inclusion proof."""

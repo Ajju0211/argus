@@ -29,7 +29,7 @@ docker compose up --build
 | **Cyber Command Dashboard** | `http://localhost:3000` | Next.js 15 / React 19 UI with real-time SSE telemetry, killchain HUD, and evidence inspector |
 | **Bifrost AI Gateway (OSS)** | `http://localhost:8080` | Self-hosted Maxim AI Bifrost Web UI, provider management, and live request logs |
 | **FastAPI Core Backend** | `http://localhost:8000` | REST API, OpenAPI Swagger docs at `/docs`, checkpointing, and LangGraph runner |
-| **Mock Vulnerable Target Lab** | `http://localhost:8888` | Isolated Apache 2.4.49 path-traversal target for safe pentest demonstrations |
+| **Mock Vulnerable Target Lab** | `http://localhost:8888` | Intentionally vulnerable Apache 2.4.49 target with 12 documented, verifiable findings — see [`infrastructure/docker/lab/KNOWN_VULNERABILITIES.md`](infrastructure/docker/lab/KNOWN_VULNERABILITIES.md) |
 
 ---
 
@@ -64,8 +64,8 @@ ARGUS complies with the hackathon requirement to use the **official open-source 
 
 ### 1. Why We Are Using Bifrost & How It Fits
 - **Unified OpenAI-Compatible Contract:** ARGUS communicates with upstream models exclusively through standard `/v1/chat/completions`. This isolates the core security engine from vendor-specific SDK quirks.
-- **Automated Multi-Provider Failover:** Autonomous penetration tests cannot tolerate provider outages or sudden rate-limits (`429 Too Many Requests`). If the primary model (Claude 3.5 Sonnet) fails or throttles, Bifrost automatically re-routes the reasoning prompt to the fallback model (GPT-4o) with zero lost context (`X-Bifrost-Fallback-Triggered`).
-- **Telemetry & Execution Budgeting:** Bifrost captures precise token usage and response latency for every reasoning step, which ARGUS records into its immutable audit trail.
+- **Automated Multi-Provider Failover:** Autonomous penetration tests cannot tolerate provider outages or sudden rate-limits (`429 Too Many Requests`). ARGUS sends the fallback chain in Bifrost's `fallbacks` array; if the primary model (Claude 3.5 Sonnet) fails or throttles, Bifrost re-routes the reasoning prompt to the fallback model (GPT-4o) with zero lost context, and reports the result through `extra_fields.routing_info`.
+- **Telemetry & Execution Budgeting:** Bifrost captures precise token usage and response latency for every reasoning step. ARGUS persists that telemetry in the assessment state and includes it in the final report.
 - **Zero Hallucination Enforcement:** Bifrost delivers structured JSON directly into Pydantic contracts (`AssessmentDecision`). If a response deviates, ARGUS schema validation catches it before any action is executed.
 
 ---
@@ -75,9 +75,10 @@ ARGUS complies with the hackathon requirement to use the **official open-source 
 2. **The Gateway Call:** [`integrations/bifrost/bifrost_client.py`](integrations/bifrost/bifrost_client.py) dispatches an HTTP POST request to `http://localhost:8080/v1/chat/completions` (or `http://bifrost:8080/v1` in Docker) with:
    - `Authorization: Bearer <ARGUS_BIFROST_API_KEY>`
    - `x-bf-vk: <ARGUS_BIFROST_API_KEY>`
-   - `X-Bifrost-Fallback: gpt-4o`
+   - `model: anthropic/claude-3-5-sonnet-20241022`
+   - `fallbacks: ["openai/gpt-4o"]`
    - `response_format: {"type": "json_object"}`
-3. **Telemetry & Execution:** The response returns the proposed action, parsed strictly into Pydantic models. Telemetry headers (`X-Bifrost-Provider`, token counts, latency) are saved into state and broadcast live over Server-Sent Events (SSE) to the dashboard.
+3. **Telemetry & Execution:** The response returns the proposed action, parsed strictly into Pydantic models. Bifrost routing metadata (`extra_fields.routing_info`), token counts, and latency are saved into state and broadcast live over Server-Sent Events (SSE) to the dashboard.
 
 ---
 
@@ -96,9 +97,11 @@ OPENAI_API_KEY=sk-proj-...           # For GPT-4o (Fallback)
 # GEMINI_API_KEY=AIzaSy...
 # GROQ_API_KEY=gsk_...
 
-# Bifrost Gateway endpoint
+# Bifrost Gateway endpoint and provider-prefixed model IDs
 ARGUS_BIFROST_BASE_URL=http://localhost:8080/v1
 ARGUS_BIFROST_API_KEY=sk-bf-local
+ARGUS_BIFROST_PRIMARY_MODEL=anthropic/claude-3-5-sonnet-20241022
+ARGUS_BIFROST_FALLBACK_MODEL=openai/gpt-4o
 
 # Enable live LLM reasoning (set to false to exit simulation mode)
 ARGUS_SIMULATION_MODE=false
@@ -168,7 +171,7 @@ Judges can verify that all LLM reasoning strictly passes through Bifrost using a
 
 1. **Live Bifrost Web UI (`http://localhost:8080`):**
    - Open `http://localhost:8080` in a browser tab.
-   - When you click "Launch Assessment" in ARGUS, watch the Bifrost dashboard update in real time via WebSockets. You will see every `POST /v1/chat/completions` request logged with timestamp, model (`claude-3-5-sonnet` or `gpt-4o`), latency, and token consumption.
+   - When you click "Launch Assessment" in ARGUS, watch the Bifrost dashboard update in real time via WebSockets. You will see every `POST /v1/chat/completions` request logged with timestamp, model (`anthropic/claude-3-5-sonnet-20241022` or `openai/gpt-4o`), latency, and token consumption.
 2. **Docker Logs Inspection:**
    ```bash
    docker logs -f argus-bifrost
@@ -179,7 +182,7 @@ Judges can verify that all LLM reasoning strictly passes through Bifrost using a
    ```
 3. **Cyber Command Dashboard HUD Badge & Telemetry:**
    - On `http://localhost:3000`, the active assessment HUD displays the **Bifrost Gateway** badge.
-   - The real-time SSE event log streams the exact model, provider, and latency metadata returned by Bifrost headers (`X-Bifrost-Provider`, `X-Bifrost-Fallback-Triggered`).
+   - The real-time SSE event log streams the exact model, provider, and latency metadata returned by Bifrost (`extra_fields.routing_info`, token usage, and latency).
 4. **Fail-Closed Verification (The Litmus Test):**
    - Stop the Bifrost container:
      ```bash
@@ -246,6 +249,7 @@ mypy core engine integrations packages apps
 │   └── tools/               # Security tool adapters (HTTP probe, nmap, nuclei, sqlmap)
 ├── docs/                    # Master architecture specifications & walkthroughs
 │   ├── PROJECT_EXPLAINED.md # Plain-English master guide for beginners and judges
+│   ├── BIFROST_TAVILY_MODEL_LOOP.md # Provider wiring, model selection & loop deep dive
 │   └── README.md            # Index of specifications
 └── tests/                   # 223 automated unit, integration, and security tests
 ```

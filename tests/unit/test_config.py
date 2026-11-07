@@ -29,13 +29,15 @@ class TestConfiguration:
         assert settings.STRICT_SCOPE_ENFORCEMENT is True
 
     def test_sponsor_gateway_defaults(self) -> None:
-        settings = get_settings()
-        assert settings.BIFROST_BASE_URL in (
+        default_model = Settings.model_fields["BIFROST_PRIMARY_MODEL"].default
+        default_fallback = Settings.model_fields["BIFROST_FALLBACK_MODEL"].default
+        default_url = Settings.model_fields["BIFROST_BASE_URL"].default
+        assert default_url in (
             "http://localhost:8080/v1",
             "https://bifrost.maxim.ai/v1",
         )
-        assert "claude" in settings.BIFROST_PRIMARY_MODEL
-        assert "gpt" in settings.BIFROST_FALLBACK_MODEL
+        assert isinstance(default_model, str) and "claude" in default_model
+        assert isinstance(default_fallback, str) and "gpt" in default_fallback
 
     def test_forbidden_tokens_tuple(self) -> None:
         settings = get_settings()

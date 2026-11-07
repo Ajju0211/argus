@@ -72,7 +72,7 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        "flex flex-col shrink-0 h-dvh bg-sidebar select-none border-r border-border/70 transition-[width] duration-200 ease-in-out overflow-hidden",
+        "flex flex-col shrink-0 h-dvh bg-sidebar select-none  transition-[width] duration-200 ease-in-out overflow-hidden",
         isCollapsed ? "w-16" : "w-60"
       )}
     >
@@ -105,14 +105,14 @@ export function AppSidebar() {
             <button
               onClick={toggleSidebar}
               type="button"
-              className="group flex h-12 w-12 items-center justify-center rounded-md hover:bg-sidebar-accent transition-colors"
+              className="group flex h-8 w-8 items-center justify-center rounded-md hover:bg-sidebar-accent transition-colors"
               aria-label="Expand sidebar"
               title="Expand sidebar"
             >
               <img
                 src="/argus_logo.png"
                 alt="ARGUS"
-                className="h-8 w-full object-contain rounded-xs dark:invert-0 invert group-hover:hidden"
+                className="h-6 w-full object-contain rounded-xs dark:invert-0 invert group-hover:hidden"
               />
               <PanelLeftOpen className="h-4 w-4 text-foreground hidden group-hover:block" />
             </button>
@@ -182,7 +182,7 @@ export function AppSidebar() {
       </nav>
 
       {/* Footer Bar: System Status */}
-      <div className="p-2.5 border-t border-border/60 shrink-0">
+      {/* <div className="p-2.5 border-t border-border/60 shrink-0">
         {!isCollapsed ? (
           <div className="flex items-center justify-between px-2 py-1.5 rounded-md bg-muted/40 border border-border/50 text-[11px]">
             <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -201,7 +201,7 @@ export function AppSidebar() {
             />
           </div>
         )}
-      </div>
+      </div> */}
     </aside>
   );
 }

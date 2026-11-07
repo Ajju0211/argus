@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from apps.api.database import Database
 from apps.api.routers.assessments import router as assessments_router
+from apps.api.routers.scope import router as scope_router
 from apps.api.runner import AssessmentRunner
 from core.config import get_settings
 
@@ -57,8 +58,8 @@ def create_app(
         CORSMiddleware,
         allow_origins=list(settings.CORS_ORIGINS),
         allow_credentials=False,
-        allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type", "Last-Event-ID"],
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Last-Event-ID", "Authorization", "X-API-Key"],
     )
 
     @app.middleware("http")
@@ -77,6 +78,7 @@ def create_app(
         return response
 
     app.include_router(assessments_router)
+    app.include_router(scope_router)
 
     @app.get("/healthz", tags=["system"])
     def health() -> dict[str, str]:

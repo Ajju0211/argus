@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, ArrowRight } from "lucide-react";
+import { Search, ArrowRight, Trash2 } from "lucide-react";
 import { AssessmentDetail } from "@/lib/types";
 import { formatTimeAgo, getStatusColor } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,9 +12,15 @@ import { Button } from "@/components/ui/button";
 
 interface AssessmentsTableProps {
   assessments: AssessmentDetail[];
+  onDeleteRequest?: (assessment: AssessmentDetail) => void;
+  deletingId?: string | null;
 }
 
-export function AssessmentsTable({ assessments }: AssessmentsTableProps) {
+export function AssessmentsTable({
+  assessments,
+  onDeleteRequest,
+  deletingId = null,
+}: AssessmentsTableProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
@@ -141,12 +147,27 @@ export function AssessmentsTable({ assessments }: AssessmentsTableProps) {
                     </td>
 
                     <td className="py-3 px-4 text-right">
-                      <Link href={`/assessments/${a.id}`}>
-                        <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs gap-1 text-muted-foreground hover:text-foreground">
-                          <span>Inspect</span>
-                          <ArrowRight className="h-3 w-3 opacity-60" />
-                        </Button>
-                      </Link>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link href={`/assessments/${a.id}`}>
+                          <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs gap-1 text-muted-foreground hover:text-foreground">
+                            <span>Inspect</span>
+                            <ArrowRight className="h-3 w-3 opacity-60" />
+                          </Button>
+                        </Link>
+                        {onDeleteRequest && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onDeleteRequest(a)}
+                            disabled={deletingId === a.id}
+                            className="h-7 w-7 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400"
+                            title={`Delete ${a.name || a.id}`}
+                            aria-label={`Delete ${a.name || a.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

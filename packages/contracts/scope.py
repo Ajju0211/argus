@@ -4,7 +4,9 @@ Defines the immutable Pydantic schema for authorized assessment scopes.
 Enforces strict typing, input validation at boundaries, and extra field rejection.
 """
 
+import hashlib
 import ipaddress
+import json
 import urllib.parse
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -168,6 +170,31 @@ class ChainStepConfig(BaseModel):
     )
 
 
+class PivotRule(BaseModel):
+    """Explicit directed edge representing an authorized lateral movement pivot."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    from_host: str = Field(..., description="Source host where a verified foothold must exist")
+    to_host: str = Field(..., description="Destination target host authorized by this pivot")
+    allowed_ports: list[int] = Field(
+        default_factory=list,
+        description="Authorized destination ports (empty means all scope-allowed ports)",
+    )
+    allowed_categories: list[str] = Field(
+        default_factory=lambda: ["network_recon", "active_template_check"],
+        description="Action categories permitted through this pivot",
+    )
+    requires_foothold: bool = Field(
+        default=True,
+        description="Whether active foothold evidence on from_host is required",
+    )
+    min_severity: str = Field(
+        default="HIGH",
+        description="Minimum finding severity on from_host",
+    )
+
+
 class ChainConfig(BaseModel):
     """Explicit authorization envelope for bounded multi-step assessment movement."""
 
@@ -179,6 +206,10 @@ class ChainConfig(BaseModel):
     )
     max_steps: int = Field(default=3, ge=1, le=10)
     allowed_steps: list[ChainStepConfig] = Field(default_factory=list)
+    pivots: list[PivotRule] = Field(
+        default_factory=list,
+        description="Explicit directed pivot edges for authorized multi-host movement",
+    )
 
 
 class ScopeDocument(BaseModel):
@@ -223,6 +254,7 @@ _HARMLESS_SCOPE_EXTRAS = frozenset(
         "judge",
         "lab",
         "metadata",
+        "objective",
         "organization",
         "owner",
         "scope_name",
@@ -357,13 +389,30 @@ def normalize_scope(raw_scope_data: dict[str, Any] | ScopeDocument | str) -> Sco
     else:
         raise TypeError(f"Unsupported scope input format: {type(raw_scope_data)}")
 
+    # Normalize common camelCase aliases
+    camel_map = {
+        "assessmentId": "assessment_id",
+        "schemaVersion": "schema_version",
+        "allowedHosts": "allowed_hosts",
+        "allowedSubnets": "allowed_subnets",
+        "deniedHosts": "denied_hosts",
+        "allowedPorts": "allowed_ports",
+        "deniedPorts": "denied_ports",
+        "allowedActions": "allowed_actions",
+        "permittedActions": "permitted_actions",
+        "actionCategories": "action_categories",
+    }
+    for camel, snake in camel_map.items():
+        if camel in data and snake not in data:
+            data[snake] = data.pop(camel)
+
     # 0. Drop harmless metadata before strict scope-field validation.
     for key in list(data):
         if key not in _SCOPE_FIELDS and key in _HARMLESS_SCOPE_EXTRAS:
             data.pop(key)
 
     # 1. Normalize top-level target aliases.
-    top_hosts = data.pop("allowed_hosts", None)
+    top_hosts = data.pop("allowed_hosts", None) or data.pop("entry_hosts", None)
     top_subnets = data.pop("allowed_subnets", None)
     top_denied = data.pop("denied_hosts", None)
     top_target = data.pop("target", None)
@@ -392,7 +441,12 @@ def normalize_scope(raw_scope_data: dict[str, Any] | ScopeDocument | str) -> Sco
     if isinstance(raw_targets, dict):
         data["targets"] = _normalize_nested_aliases(
             raw_targets,
-            {"hosts": "allowed_hosts", "subnets": "allowed_subnets", "denied": "denied_hosts"},
+            {
+                "hosts": "allowed_hosts",
+                "subnets": "allowed_subnets",
+                "denied": "denied_hosts",
+                "entry_hosts": "allowed_hosts",
+            },
             ("allowed_hosts", "allowed_subnets", "denied_hosts"),
         )
         nested = data["targets"]
@@ -455,7 +509,7 @@ def normalize_scope(raw_scope_data: dict[str, Any] | ScopeDocument | str) -> Sco
         data["ports"] = normalized_ports
 
     # 5. Normalize chain aliases.
-    chain_aliases = [data.pop(name, None) for name in ("chain", "multi_step")]
+    chain_aliases = [data.pop(name, None) for name in ("chain", "multi_step", "lateral_movement")]
     alias_chain = next((value for value in chain_aliases if value is not None), None)
     if alias_chain is not None:
         if "authorized_chain" in data:
@@ -463,9 +517,15 @@ def normalize_scope(raw_scope_data: dict[str, Any] | ScopeDocument | str) -> Sco
                 "Specify multi-step authorization either under 'authorized_chain' "
                 "or via an alias, not both."
             )
-        data["authorized_chain"] = (
-            {"enabled": bool(alias_chain)} if isinstance(alias_chain, bool) else alias_chain
-        )
+        if isinstance(alias_chain, bool):
+            data["authorized_chain"] = {"enabled": alias_chain}
+        elif isinstance(alias_chain, dict):
+            c_dict = dict(alias_chain)
+            if "allowed_pivots" in c_dict and "pivots" not in c_dict:
+                c_dict["pivots"] = c_dict.pop("allowed_pivots")
+            data["authorized_chain"] = c_dict
+        else:
+            data["authorized_chain"] = alias_chain
 
     # 6. Default assessment ID if omitted.
     if "assessment_id" not in data:
@@ -481,3 +541,21 @@ def normalize_scope(raw_scope_data: dict[str, Any] | ScopeDocument | str) -> Sco
 
     # 8. Build and validate ScopeDocument.
     return ScopeDocument.model_validate(data)
+
+
+def compute_scope_hash(scope_data: ScopeDocument | dict[str, Any] | str) -> str:
+    """Computes deterministic SHA-256 digest of canonical sorted JSON ScopeDocument (Spec 12)."""
+    if isinstance(scope_data, ScopeDocument):
+        raw_dict = scope_data.model_dump(mode="json")
+    elif isinstance(scope_data, str):
+        doc = normalize_scope(scope_data)
+        raw_dict = doc.model_dump(mode="json")
+    elif isinstance(scope_data, dict):
+        raw_dict = scope_data
+    else:
+        raise TypeError(f"Unsupported scope data type: {type(scope_data)}")
+
+    canonical = json.dumps(raw_dict, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"
+
